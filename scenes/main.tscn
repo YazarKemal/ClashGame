@@ -1,0 +1,12 @@
+[gd_scene load_steps=3 format=3 uid="uid://bcmgmainvill0"]
+
+[ext_resource type="Script" path="res://scripts/village_ground.gd" id="1_ground"]
+[ext_resource type="Script" path="res://scripts/touch_camera.gd" id="2_touchcam"]
+
+[node name="Main" type="Node2D"]
+
+[node name="VillageGround" type="Node2D" parent="."]
+script = ExtResource("1_ground")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+script = ExtResource("2_touchcam")
