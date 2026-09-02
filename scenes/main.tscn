@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://scripts/village_ground.gd" id="1_ground"]
 [ext_resource type="Script" path="res://scripts/touch_camera.gd" id="2_touchcam"]
 [ext_resource type="Script" path="res://scripts/building_manager.gd" id="3_manager"]
-[ext_resource type="Script" path="res://scripts/ui.gd" id="4_ui"]
+[ext_resource type="PackedScene" path="res://scenes/ui.tscn" id="4_ui"]
 
 [node name="Main" type="Node2D"]
 
@@ -16,6 +16,5 @@ script = ExtResource("3_manager")
 [node name="Camera2D" type="Camera2D" parent="."]
 script = ExtResource("2_touchcam")
 
-[node name="UI" type="CanvasLayer" parent="."]
-script = ExtResource("4_ui")
+[node name="UI" parent="." instance=ExtResource("4_ui")]
 manager_path = NodePath("../BuildingManager")
