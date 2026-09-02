@@ -6,7 +6,7 @@ signal hp_changed(current_hp: int, max_hp: int)
 signal upgraded(level: int)
 
 enum State { PREVIEW, PLACED }
-enum Type { TOWER, MINE, TOWN_HALL, WALL }
+enum Type { TOWER, MINE, TOWN_HALL, WALL, ELIXIR_COLLECTOR }
 
 const ATTACK_RANGE := 200.0
 const ATTACK_DAMAGE := 25
@@ -21,6 +21,7 @@ const DATA := {
 		"currency": "gold",
 		"color": Color(0.4, 0.6, 1.0, 1.0),
 		"gold_per_sec": 0,
+		"elixir_per_sec": 0,
 		"max_hp": 300,
 	},
 	Type.MINE: {
@@ -30,6 +31,7 @@ const DATA := {
 		"currency": "elixir",
 		"color": Color(1.0, 0.78, 0.2, 1.0),
 		"gold_per_sec": 5,
+		"elixir_per_sec": 0,
 		"max_hp": 200,
 	},
 	Type.TOWN_HALL: {
@@ -39,6 +41,7 @@ const DATA := {
 		"currency": "gold",
 		"color": Color(0.42, 0.2, 0.62, 1.0),
 		"gold_per_sec": 0,
+		"elixir_per_sec": 0,
 		"max_hp": 600,
 	},
 	Type.WALL: {
@@ -48,7 +51,18 @@ const DATA := {
 		"currency": "gold",
 		"color": Color(0.42, 0.42, 0.46, 1.0),
 		"gold_per_sec": 0,
+		"elixir_per_sec": 0,
 		"max_hp": 800,
+	},
+	Type.ELIXIR_COLLECTOR: {
+		"name": "İksir Toplayıcı",
+		"size": 2,
+		"cost": 100,
+		"currency": "gold",
+		"color": Color(0.8, 0.2, 0.8, 1.0),
+		"gold_per_sec": 0,
+		"elixir_per_sec": 5,
+		"max_hp": 250,
 	},
 }
 
@@ -67,6 +81,7 @@ var grid_size := 2
 var cost := 0
 var currency := "gold"
 var gold_per_sec := 0
+var elixir_per_sec := 0
 var max_hp := 100
 var hp := max_hp
 var level := 1
@@ -94,6 +109,7 @@ func _apply_def(def: Dictionary) -> void:
 	cost = def["cost"]
 	currency = def["currency"]
 	gold_per_sec = def["gold_per_sec"]
+	elixir_per_sec = def["elixir_per_sec"]
 	max_hp = def["max_hp"]
 	hp = max_hp
 	_base_color = def["color"]
@@ -138,6 +154,8 @@ func upgrade() -> bool:
 		attack_range = attack_range * 1.1
 	elif building_type == Type.MINE:
 		gold_per_sec = int(gold_per_sec * 1.4)
+	elif building_type == Type.ELIXIR_COLLECTOR:
+		elixir_per_sec = int(elixir_per_sec * 1.5)
 	_apply_hp_bar()
 	_flash_upgrade()
 	upgraded.emit(level)
@@ -186,7 +204,7 @@ func place_at(c: Vector2i) -> void:
 	position = _cell_center(c)
 	_apply_state()
 	_hp_bar.show()
-	if gold_per_sec > 0:
+	if gold_per_sec > 0 or elixir_per_sec > 0:
 		_start_production()
 	if building_type == Type.TOWER:
 		_start_attacks()
@@ -257,9 +275,9 @@ func _start_production() -> void:
 	_timer.timeout.connect(_produce)
 
 func _produce() -> void:
-	if gold_per_sec <= 0:
+	if gold_per_sec <= 0 and elixir_per_sec <= 0:
 		return
-	GameManager.add_resources(gold_per_sec, 0)
+	GameManager.add_resources(gold_per_sec, elixir_per_sec)
 
 func _start_attacks() -> void:
 	if _attack_timer != null:

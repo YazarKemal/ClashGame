@@ -15,6 +15,7 @@ var manager: BuildingManager
 @onready var mine_button: Button = $BuildMenu/Margin/VBox/MineButton
 @onready var town_hall_button: Button = $BuildMenu/Margin/VBox/TownHallButton
 @onready var wall_button: Button = $BuildMenu/Margin/VBox/WallButton
+@onready var elixir_collector_button: Button = $BuildMenu/Margin/VBox/ElixirCollectorButton
 @onready var close_menu_button: Button = $BuildMenu/Margin/VBox/CloseMenuButton
 @onready var confirm_button: Button = $PlacementButtons/ConfirmButton
 @onready var cancel_button: Button = $PlacementButtons/CancelButton
@@ -43,6 +44,7 @@ func _ready() -> void:
 	mine_button.pressed.connect(_start_mine_placement)
 	town_hall_button.pressed.connect(_start_town_hall_placement)
 	wall_button.pressed.connect(_start_wall_placement)
+	elixir_collector_button.pressed.connect(_start_elixir_collector_placement)
 	close_menu_button.pressed.connect(_close_build_menu)
 	confirm_button.pressed.connect(_on_confirm_pressed)
 	cancel_button.pressed.connect(_on_cancel_pressed)
@@ -105,6 +107,11 @@ func _start_town_hall_placement() -> void:
 
 func _start_wall_placement() -> void:
 	manager.start_placement(Building.Type.WALL)
+	build_menu.hide()
+	build_button.show()
+
+func _start_elixir_collector_placement() -> void:
+	manager.start_placement(Building.Type.ELIXIR_COLLECTOR)
 	build_menu.hide()
 	build_button.show()
 
