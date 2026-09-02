@@ -8,6 +8,12 @@ class_name DefenseDirector
 
 signal state_changed(new_state: int)
 signal battle_finished(result: Dictionary)
+## Live state the HUD mirrors. Emitted when values change; the UI never computes
+## any of these itself. UI display only; win/loss stays solely in _finish().
+signal enemy_count_changed(current: int, total: int)
+signal destruction_changed(percent: int)
+signal town_hall_status_changed(alive: bool)
+signal battle_started
 
 ## Outcome + live states. BATTLE runs while enemies fight; WIN/LOSS are final.
 enum State { PREPARING, BATTLE, WIN, LOSS }
@@ -43,6 +49,8 @@ var active_enemies: Array = []
 var _initial_buildings := 0
 var _destroyed_non_wall := 0
 var _town_hall_destroyed := false
+## Size of the whole attacking wave, for the HUD's remaining/total readout.
+var _total_enemies := 0
 
 ## Prepares the battle against `mgr`'s already-cloned village and launches the
 ## single attack wave. Safe to call once per scene instance.
@@ -54,6 +62,11 @@ func initialize(mgr: BuildingManager) -> void:
 	_hook_building_destruction()
 	_spawn_wave(WAVES[0])
 	_set_state(State.BATTLE)
+	_total_enemies = active_enemies.size()
+	destruction_changed.emit(0)
+	town_hall_status_changed.emit(true)
+	battle_started.emit()
+	enemy_count_changed.emit(_total_enemies, _total_enemies)
 
 ## True when the current battle has already reached a final outcome.
 func has_finished() -> bool:
@@ -129,9 +142,12 @@ func _on_clone_building_destroyed(_cells: Array, b: Building) -> void:
 		return
 	if b.building_type == Building.Type.TOWN_HALL:
 		_town_hall_destroyed = true
+		town_hall_status_changed.emit(false)
+		destruction_changed.emit(int(round(destruction_percent())))
 		_finish(State.LOSS)
 		return
 	_destroyed_non_wall += 1
+	destruction_changed.emit(int(round(destruction_percent())))
 	if destruction_percent() >= LOSS_PERCENT:
 		_finish(State.LOSS)
 
@@ -143,6 +159,7 @@ func _on_enemy_died(u: Unit) -> void:
 			active_enemies.remove_at(i)
 	if battle_over:
 		return
+	enemy_count_changed.emit(active_enemies.size(), _total_enemies)
 	if active_enemies.is_empty():
 		_finish(State.WIN)
 

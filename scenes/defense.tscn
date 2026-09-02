@@ -1,10 +1,11 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/defense.gd" id="1_defense"]
 [ext_resource type="Script" path="res://scripts/village_ground.gd" id="2_ground"]
 [ext_resource type="Script" path="res://scripts/building_manager.gd" id="3_manager"]
 [ext_resource type="Script" path="res://scripts/camera_controller.gd" id="4_touchcam"]
 [ext_resource type="Script" path="res://scripts/defense_director.gd" id="5_director"]
+[ext_resource type="Script" path="res://scripts/defense_ui.gd" id="6_ui"]
 
 [node name="Defense" type="Node2D"]
 script = ExtResource("1_defense")
@@ -21,3 +22,6 @@ manager_path = NodePath("../BuildingManager")
 
 [node name="DefenseDirector" type="Node" parent="."]
 script = ExtResource("5_director")
+
+[node name="DefenseUI" type="CanvasLayer" parent="."]
+script = ExtResource("6_ui")

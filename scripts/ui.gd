@@ -12,6 +12,7 @@ var manager: BuildingManager
 @onready var deploy_button: Button = $DeployButton
 @onready var reset_button: Button = $ResetButton
 @onready var expedition_button: Button = $ExpeditionButton
+@onready var defense_button: Button = $DefenseButton
 @onready var attack_button: Button = $AttackButton
 @onready var build_menu: PanelContainer = $BuildMenu
 @onready var tower_button: Button = $BuildMenu/Margin/VBox/TowerButton
@@ -61,6 +62,7 @@ func _ready() -> void:
 	deploy_button.pressed.connect(_on_deploy_pressed)
 	reset_button.pressed.connect(_on_reset_pressed)
 	expedition_button.pressed.connect(_on_expedition_pressed)
+	defense_button.pressed.connect(_on_defense_pressed)
 	attack_button.pressed.connect(_on_attack_pressed)
 	tower_button.pressed.connect(_start_tower_placement)
 	mine_button.pressed.connect(_start_mine_placement)
@@ -135,6 +137,11 @@ func _on_expedition_pressed() -> void:
 	GameManager.raid_is_campaign = true
 	GameManager.raid_return_scene = "res://scenes/main.tscn"
 	get_tree().change_scene_to_file("res://scenes/world_map.tscn")
+
+## Enters the disposable village-defense scene. Defense clones the last saved
+## village itself, so nothing is saved here and no offline timer is reset.
+func _on_defense_pressed() -> void:
+	get_tree().change_scene_to_file("res://scenes/defense.tscn")
 
 ## Opens the campaign selection panel instead of jumping straight into a raid.
 func _on_attack_pressed() -> void:

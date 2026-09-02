@@ -131,6 +131,19 @@ grow_horizontal = 0
 mouse_filter = 0
 text = "🗺 Sefer Haritası"
 
+[node name="DefenseButton" type="Button" parent="."]
+custom_minimum_size = Vector2(160, 60)
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -200.0
+offset_top = 208.0
+offset_right = -40.0
+offset_bottom = 268.0
+grow_horizontal = 0
+mouse_filter = 0
+text = "Köy Savunması"
+
 [node name="AttackButton" type="Button" parent="."]
 custom_minimum_size = Vector2(160, 60)
 anchors_preset = 2
