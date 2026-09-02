@@ -60,10 +60,22 @@ func cancel_placement() -> void:
 	placing = false
 	placement_ended.emit(false)
 
-func _process(_delta: float) -> void:
+func _unhandled_input(event: InputEvent) -> void:
 	if not placing or _preview == null:
 		return
-	var cell := GridConfig.world_to_cell(get_global_mouse_position())
+	# Only move the preview from real map touches/drags, never from UI presses.
+	var drag: InputEventScreenDrag = event as InputEventScreenDrag
+	var touch: InputEventScreenTouch = event as InputEventScreenTouch
+	if drag != null:
+		_move_preview_to(drag.position)
+	elif touch != null and touch.pressed:
+		_move_preview_to(touch.position)
+
+func _move_preview_to(screen_pos: Vector2) -> void:
+	# Convert the viewport/screen point into world space (accounts for the
+	# camera pan/zoom) before snapping to a grid cell.
+	var world := get_global_transform_with_canvas().affine_inverse() * screen_pos
+	var cell := GridConfig.world_to_cell(world)
 	if cell != _preview_cell:
 		_preview_cell = cell
 		_apply_preview_validity()
