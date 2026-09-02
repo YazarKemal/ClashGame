@@ -76,6 +76,11 @@ custom_minimum_size = Vector2(200, 60)
 layout_mode = 2
 text = "Belediye (250 G)"
 
+[node name="WallButton" type="Button" parent="BuildMenu/Margin/VBox"]
+custom_minimum_size = Vector2(200, 60)
+layout_mode = 2
+text = "Duvar (20 G)"
+
 [node name="CloseMenuButton" type="Button" parent="BuildMenu/Margin/VBox"]
 custom_minimum_size = Vector2(200, 60)
 layout_mode = 2

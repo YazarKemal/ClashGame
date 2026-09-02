@@ -14,6 +14,7 @@ var manager: BuildingManager
 @onready var tower_button: Button = $BuildMenu/Margin/VBox/TowerButton
 @onready var mine_button: Button = $BuildMenu/Margin/VBox/MineButton
 @onready var town_hall_button: Button = $BuildMenu/Margin/VBox/TownHallButton
+@onready var wall_button: Button = $BuildMenu/Margin/VBox/WallButton
 @onready var close_menu_button: Button = $BuildMenu/Margin/VBox/CloseMenuButton
 @onready var confirm_button: Button = $PlacementButtons/ConfirmButton
 @onready var cancel_button: Button = $PlacementButtons/CancelButton
@@ -30,6 +31,7 @@ func _ready() -> void:
 	tower_button.pressed.connect(_start_tower_placement)
 	mine_button.pressed.connect(_start_mine_placement)
 	town_hall_button.pressed.connect(_start_town_hall_placement)
+	wall_button.pressed.connect(_start_wall_placement)
 	close_menu_button.pressed.connect(_close_build_menu)
 	confirm_button.pressed.connect(_on_confirm_pressed)
 	cancel_button.pressed.connect(_on_cancel_pressed)
@@ -73,6 +75,11 @@ func _start_mine_placement() -> void:
 
 func _start_town_hall_placement() -> void:
 	manager.start_placement(Building.Type.TOWN_HALL)
+	build_menu.hide()
+	build_button.show()
+
+func _start_wall_placement() -> void:
+	manager.start_placement(Building.Type.WALL)
 	build_menu.hide()
 	build_button.show()
 

@@ -4,7 +4,7 @@ class_name Building
 signal destroyed(cells: Array)
 
 enum State { PREVIEW, PLACED }
-enum Type { TOWER, MINE, TOWN_HALL }
+enum Type { TOWER, MINE, TOWN_HALL, WALL }
 
 const ATTACK_RANGE := 200.0
 const ATTACK_DAMAGE := 25
@@ -38,6 +38,15 @@ const DATA := {
 		"color": Color(0.42, 0.2, 0.62, 1.0),
 		"gold_per_sec": 0,
 		"max_hp": 600,
+	},
+	Type.WALL: {
+		"name": "Duvar",
+		"size": 1,
+		"cost": 20,
+		"currency": "gold",
+		"color": Color(0.42, 0.42, 0.46, 1.0),
+		"gold_per_sec": 0,
+		"max_hp": 800,
 	},
 }
 
@@ -91,6 +100,10 @@ func gold_cost() -> int:
 func elixir_cost() -> int:
 	return cost if currency == "elixir" else 0
 
+## True if this is a Wall (defensive blocker), which units must break first.
+func is_wall() -> bool:
+	return building_type == Type.WALL
+
 func _build_footprint() -> void:
 	var size := grid_size * GridConfig.TILE_SIZE
 	var half := size * 0.5
@@ -141,15 +154,42 @@ func take_damage(amount: int) -> void:
 	if state != State.PLACED:
 		return
 	hp -= amount
+	_flash_hit()
 	if _hp_bar != null:
 		_hp_bar.value = max(hp, 0)
 	if hp <= 0:
 		_die()
 
+## Briefly flashes the body white so hits are visible.
+func _flash_hit() -> void:
+	if _body == null:
+		return
+	_body.color = Color.WHITE
+	var tw := create_tween()
+	tw.tween_property(_body, "color", _base_color, 0.1)
+
 func _die() -> void:
+	_spawn_death_particles()
 	remove_from_group("buildings")
 	destroyed.emit(cells)
 	queue_free()
+
+func _spawn_death_particles() -> void:
+	var p := CPUParticles2D.new()
+	p.one_shot = true
+	p.explosiveness = 1.0
+	p.emitting = true
+	p.amount = 24
+	p.lifetime = 0.6
+	p.direction = Vector2.UP
+	p.spread = 180.0
+	p.initial_velocity_min = 60.0
+	p.initial_velocity_max = 140.0
+	p.gravity = Vector2(0, 200)
+	p.color = _base_color
+	p.position = position
+	add_child(p)
+	p.finished.connect(p.queue_free)
 
 func _start_production() -> void:
 	if _timer != null:
