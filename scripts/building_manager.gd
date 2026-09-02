@@ -16,6 +16,7 @@ const SELECT_TAP_DIST := 15.0
 
 var placing := false
 var spawn_mode := false
+var selected_unit_type := Unit.Type.BARBARIAN
 var _preview: Building = null
 var _preview_cell := Vector2i.ZERO
 var _selected: Building = null
@@ -83,7 +84,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if spawn_mode and not placing:
 		if event is InputEventScreenTouch and event.pressed:
-			_spawn_unit_at(event.position)
+			_spawn_unit_at()
 		return
 	if placing and _preview != null:
 		# Only move the preview from real map touches/drags, never from UI presses.
@@ -136,10 +137,16 @@ func _set_selected(b: Building) -> void:
 func _on_selected_destroyed(_cells: Array) -> void:
 	_set_selected(null)
 
-func _spawn_unit_at(screen_pos: Vector2) -> void:
-	var world := get_global_transform_with_canvas().affine_inverse() * screen_pos
-	var u: Node2D = UNIT_SCENE.instantiate()
-	u.position = world
+## Deploys the currently selected troop at the tap point, charging its elixir
+## cost first (nothing spawns when the player cannot afford it).
+func _spawn_unit_at() -> void:
+	var cost := Unit.cost_for(selected_unit_type)
+	if not GameManager.spend_resources(0, cost):
+		print("Yetersiz İksir: %d" % cost)
+		return
+	var u: Unit = UNIT_SCENE.instantiate()
+	u.unit_type = selected_unit_type
+	u.position = get_global_mouse_position()
 	add_child(u)
 
 func _on_building_destroyed(cells: Array) -> void:

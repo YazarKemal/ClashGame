@@ -25,6 +25,10 @@ var manager: BuildingManager
 @onready var panel_hp: Label = $BuildingPanel/Margin/VBox/HpLabel
 @onready var upgrade_button: Button = $BuildingPanel/Margin/VBox/UpgradeButton
 @onready var close_panel_button: Button = $BuildingPanel/Margin/VBox/ClosePanelButton
+@onready var troop_bar: HBoxContainer = $TroopBar
+@onready var barbar_button: Button = $TroopBar/BarbarButton
+@onready var archer_button: Button = $TroopBar/ArcherButton
+@onready var giant_button: Button = $TroopBar/GiantButton
 
 var _selected_building: Building = null
 
@@ -44,6 +48,9 @@ func _ready() -> void:
 	cancel_button.pressed.connect(_on_cancel_pressed)
 	upgrade_button.pressed.connect(_on_upgrade_pressed)
 	close_panel_button.pressed.connect(_on_close_panel)
+	barbar_button.pressed.connect(_on_barbar_pressed)
+	archer_button.pressed.connect(_on_archer_pressed)
+	giant_button.pressed.connect(_on_giant_pressed)
 
 	manager.building_selected.connect(_on_building_selected)
 
@@ -51,6 +58,7 @@ func _ready() -> void:
 	cancel_button.hide()
 	build_menu.hide()
 	building_panel.hide()
+	troop_bar.hide()
 
 	GameManager.resource_changed.connect(_update_resources)
 	_update_resources(GameManager.gold, GameManager.elixir)
@@ -69,9 +77,12 @@ func _on_deploy_pressed() -> void:
 	if manager.spawn_mode:
 		manager.set_spawn_mode(false)
 		deploy_button.text = "Asker Bırak"
+		troop_bar.hide()
 	else:
 		manager.set_spawn_mode(true)
 		deploy_button.text = "Kapat"
+		troop_bar.show()
+		_refresh_troop_bar()
 
 func _close_build_menu() -> void:
 	build_menu.hide()
@@ -100,6 +111,7 @@ func _start_wall_placement() -> void:
 func _on_placement_started() -> void:
 	confirm_button.show()
 	cancel_button.show()
+	troop_bar.hide()
 
 func _on_placement_ended(_success: bool) -> void:
 	confirm_button.hide()
@@ -167,3 +179,23 @@ func _on_close_panel() -> void:
 	_disconnect_selected()
 	_selected_building = null
 	building_panel.hide()
+
+func _on_barbar_pressed() -> void:
+	_select_troop(Unit.Type.BARBARIAN)
+
+func _on_archer_pressed() -> void:
+	_select_troop(Unit.Type.ARCHER)
+
+func _on_giant_pressed() -> void:
+	_select_troop(Unit.Type.GIANT)
+
+func _select_troop(t: Unit.Type) -> void:
+	manager.selected_unit_type = t
+	_refresh_troop_bar()
+
+## Highlights the currently selected troop in the selector bar.
+func _refresh_troop_bar() -> void:
+	var sel := manager.selected_unit_type
+	barbar_button.modulate = Color(1, 1, 1, 1) if sel == Unit.Type.BARBARIAN else Color(0.5, 0.5, 0.5, 1)
+	archer_button.modulate = Color(1, 1, 1, 1) if sel == Unit.Type.ARCHER else Color(0.5, 0.5, 0.5, 1)
+	giant_button.modulate = Color(1, 1, 1, 1) if sel == Unit.Type.GIANT else Color(0.5, 0.5, 0.5, 1)
