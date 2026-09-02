@@ -39,7 +39,7 @@ func update_gained(gold: int, elixir: int) -> void:
 
 func show_result(pct: int, stars: int, gold: int, elixir: int) -> void:
 	result_window.show()
-	title_label.text = "Zafer!" if stars >= 3 else "Savaş Bitti"
+	title_label.text = "Zafer!" if pct > 0 else "Yenilgi!"
 	destruction_label.text = "Yıkım: %d%%" % pct
 	stars_label.text = "Yıldız: %s" % ("★".repeat(stars) + "☆".repeat(maxi(3 - stars, 0)))
 	loot_label.text = "Ganimet: %d G / %d İ" % [gold, elixir]
