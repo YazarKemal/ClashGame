@@ -24,24 +24,32 @@ var _check_timer: Timer = null
 
 func _ready() -> void:
 	GameManager.in_raid = true
-	_current_level = GameManager.selected_level
-	_build_enemy_village()
+	# Two callers reuse this scene: the village campaign (RaidManager level,
+	# records stars, returns to the village) and a world-map city attack
+	# (GameManager.raid_layout, no star recording, returns to the world map).
+	if GameManager.raid_is_campaign:
+		_current_level = GameManager.selected_level
+		var level: Dictionary = RaidManager.level_data(_current_level)
+		_build_enemy_village(level["spawns"])
+		ui.set_loot_pool(level["loot_gold"], level["loot_elixir"])
+	else:
+		var layout: Dictionary = GameManager.raid_layout
+		_build_enemy_village(layout.get("spawns", []))
+		ui.set_loot_pool(int(layout.get("loot_gold", 0)), int(layout.get("loot_elixir", 0)))
 	manager.deploy_only_on_border = true
 	manager.set_spawn_mode(true)
 	manager.unit_spawned.connect(_on_unit_spawned)
 	ui.setup(self, manager)
-	var level: Dictionary = RaidManager.level_data(_current_level)
-	ui.set_loot_pool(level["loot_gold"], level["loot_elixir"])
 	_setup_check_timer()
 
 func _on_unit_spawned() -> void:
 	_troops_deployed = true
 
-## Builds the selected level's enemy layout and assigns its loot pool to the
-## buildings so destroyed buildings drop their share.
-func _build_enemy_village() -> void:
-	var level: Dictionary = RaidManager.level_data(_current_level)
-	for spawn in level["spawns"]:
+## Builds an enemy village from a list of spawn entries and assigns their loot
+## so destroyed buildings drop their share. Works for both campaign levels and
+## world-city layouts.
+func _build_enemy_village(spawns: Array) -> void:
+	for spawn in spawns:
 		var s: Dictionary = spawn
 		_spawn(s["type"], s["cell"], s["loot_g"], s["loot_e"], int(s["level"]))
 
@@ -148,7 +156,11 @@ func _compute_stars(pct: int, full_clear: bool) -> int:
 ## updated vault without altering the saved main-village buildings.
 func _return_home() -> void:
 	GameManager.in_raid = false
-	GameManager.record_level_result(_current_level, _last_stars)
+	if GameManager.raid_is_campaign:
+		GameManager.record_level_result(_current_level, _last_stars)
 	GameManager.add_resources(gained_gold, gained_elixir)
 	SaveManager.save_resources_only()
-	get_tree().change_scene_to_file(MAIN_SCENE)
+	var target := GameManager.raid_return_scene
+	if GameManager.raid_is_campaign or target.is_empty():
+		target = MAIN_SCENE
+	get_tree().change_scene_to_file(target)

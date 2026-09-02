@@ -13,6 +13,27 @@ var elixir := 500
 ## production so raid buildings never credit the player's real vault.
 var in_raid := false
 
+## --- Macro world map state (shared between the village and world scenes) ---
+
+## Army icon position on the world map. Persists across scene switches so a
+## world-city raid returns the player to the same spot. Zero means "not set yet".
+var world_army_pos := Vector2.ZERO
+
+## --- Raid routing: campaign village attack vs a world-map city attack ---
+## Both flows reuse raid.tscn; these fields tell it which one is running and
+## where to send the player when the battle ends.
+
+## True = campaign PvE level (records stars, returns to the village).
+## False = a world-map faction city attack (no star recording, returns to the
+## map). Must be reset to true whenever entering a campaign raid.
+var raid_is_campaign := true
+
+## Enemy layout (spawns + loot pool) used for non-campaign city attacks.
+var raid_layout: Dictionary = {}
+
+## Scene to return to when a non-campaign raid ends.
+var raid_return_scene := "res://scenes/main.tscn"
+
 ## Trained troops ready for deployment: Unit.Type (int) -> trained count.
 var army_data: Dictionary = {}
 

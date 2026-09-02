@@ -86,6 +86,12 @@ func cancel_placement() -> void:
 	placement_ended.emit(false)
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		_handle_mouse_button(event)
+		return
+	if event is InputEventMouseMotion:
+		_handle_mouse_motion(event)
+		return
 	if not (event is InputEventScreenTouch or event is InputEventScreenDrag):
 		return
 	if spawn_mode and not placing:
@@ -101,6 +107,30 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	# Idle: a tap selects a building, a tap on empty ground deselects.
 	_handle_selection_tap(event)
+
+## Mouse mirror of the touch flow above: left-click selects/spawns/positions the
+## preview. Middle/right buttons are ignored here (the camera pans with them).
+func _handle_mouse_button(event: InputEventMouseButton) -> void:
+	if event.button_index != MOUSE_BUTTON_LEFT:
+		return
+	if spawn_mode and not placing:
+		if event.pressed:
+			_spawn_unit_at()
+		return
+	if placing and _preview != null:
+		if event.pressed:
+			_move_preview_to(event.position)
+		return
+	# Idle: press begins tap tracking; a release within the distance selects.
+	if event.pressed:
+		_press_screen = event.position
+	elif event.position.distance_to(_press_screen) <= SELECT_TAP_DIST:
+		_select_at()
+
+## While placing, the preview follows the mouse cursor.
+func _handle_mouse_motion(event: InputEventMouseMotion) -> void:
+	if placing and _preview != null:
+		_move_preview_to(event.position)
 
 ## A release within SELECT_TAP_DIST of the press is a tap (select); anything
 ## larger was a pan, so it selects nothing. Tolerates tiny drag jitter.

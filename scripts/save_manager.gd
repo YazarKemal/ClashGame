@@ -133,7 +133,7 @@ func _apply_offline_income(manager: BuildingManager, elapsed: int) -> void:
 	if gold <= 0 and elixir <= 0:
 		return
 	GameManager.gold += gold
-	GameManager.elixir += elix
+	GameManager.elixir += elixir
 	GameManager.resource_changed.emit(GameManager.gold, GameManager.elixir)
 
 	var lines: Array[String] = []
