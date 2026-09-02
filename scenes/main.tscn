@@ -1,12 +1,21 @@
-[gd_scene load_steps=3 format=3 uid="uid://bcmgmainvill0"]
+[gd_scene load_steps=5 format=3 uid="uid://bcmgmainvill0"]
 
 [ext_resource type="Script" path="res://scripts/village_ground.gd" id="1_ground"]
 [ext_resource type="Script" path="res://scripts/touch_camera.gd" id="2_touchcam"]
+[ext_resource type="Script" path="res://scripts/building_manager.gd" id="3_manager"]
+[ext_resource type="Script" path="res://scripts/ui.gd" id="4_ui"]
 
 [node name="Main" type="Node2D"]
 
 [node name="VillageGround" type="Node2D" parent="."]
 script = ExtResource("1_ground")
 
+[node name="BuildingManager" type="Node2D" parent="."]
+script = ExtResource("3_manager")
+
 [node name="Camera2D" type="Camera2D" parent="."]
 script = ExtResource("2_touchcam")
+
+[node name="UI" type="CanvasLayer" parent="."]
+script = ExtResource("4_ui")
+manager_path = NodePath("../BuildingManager")
