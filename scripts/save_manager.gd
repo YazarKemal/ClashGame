@@ -1,7 +1,7 @@
-class_name SaveManager
-## Persists the village layout and resources to a JSON file on disk. Exposed
-## as static helpers so any node (BuildingManager, UI, Main) can trigger a
-## save or load without needing an autoload instance.
+extends Node
+## Autoload singleton that persists the village layout and resources to a
+## JSON file on disk. Any node can trigger a save or load by name
+## (SaveManager), just like GameManager.
 
 const SAVE_PATH := "user://save_game.json"
 
@@ -23,7 +23,7 @@ const TYPE_FROM_NAME := {
 }
 
 ## Writes the current resources and every placed building to the save file.
-static func save_game(manager: BuildingManager) -> void:
+func save_game(manager: BuildingManager) -> void:
 	var buildings := []
 	for b in manager.get_tree().get_nodes_in_group("buildings"):
 		if b is Building and b.state == Building.State.PLACED:
@@ -48,7 +48,7 @@ static func save_game(manager: BuildingManager) -> void:
 ## Restores resources and buildings from the save file. Returns true when a
 ## file was loaded; when none exists (or it is corrupt) it seeds a fresh
 ## village with a Town Hall in the center and returns false.
-static func load_game(manager: BuildingManager) -> bool:
+func load_game(manager: BuildingManager) -> bool:
 	if not FileAccess.file_exists(SAVE_PATH):
 		_init_default_village(manager)
 		return false
@@ -78,7 +78,7 @@ static func load_game(manager: BuildingManager) -> bool:
 
 ## Destroys all buildings, clears the grid and resources, removes the save
 ## file, then reseeds a fresh village so the load path can be tested.
-static func reset_village(manager: BuildingManager) -> void:
+func reset_village(manager: BuildingManager) -> void:
 	for b in manager.get_tree().get_nodes_in_group("buildings"):
 		if b is Building:
 			b.free()
@@ -94,7 +94,7 @@ static func reset_village(manager: BuildingManager) -> void:
 
 ## Seeds a brand-new village: default resources plus one Town Hall in the
 ## center of the grid.
-static func _init_default_village(manager: BuildingManager) -> void:
+func _init_default_village(manager: BuildingManager) -> void:
 	GameManager.gold = 500
 	GameManager.elixir = 500
 	GameManager.resource_changed.emit(500, 500)
@@ -103,7 +103,7 @@ static func _init_default_village(manager: BuildingManager) -> void:
 
 ## Instantiates a building at the saved cell, restores its level (recomputing
 ## the stats that upgrade() scales) and its current HP, then occupies the grid.
-static func _spawn_building(manager: BuildingManager, type: Building.Type,
+func _spawn_building(manager: BuildingManager, type: Building.Type,
 		cell: Vector2i, level: int, hp: int) -> void:
 	var b: Building = manager.BUILDING_SCENE.instantiate()
 	b.building_type = type
@@ -129,5 +129,5 @@ static func _spawn_building(manager: BuildingManager, type: Building.Type,
 		manager.occupied[c] = true
 
 ## Converts a {"x": int, "y": int} dictionary back into a grid cell.
-static func _cell_from_dict(d: Dictionary) -> Vector2i:
+func _cell_from_dict(d: Dictionary) -> Vector2i:
 	return Vector2i(int(d.get("x", 0)), int(d.get("y", 0)))
