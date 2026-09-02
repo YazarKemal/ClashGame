@@ -16,6 +16,30 @@ var in_raid := false
 ## Trained troops ready for deployment: Unit.Type (int) -> trained count.
 var army_data: Dictionary = {}
 
+## Campaign level currently being raided. Set by the campaign UI before the
+## raid scene loads; read by raid.gd to build the matching enemy village.
+var selected_level := 1
+
+## Best stars earned per campaign level: level (int) -> 0..3.
+var best_stars: Dictionary = {}
+
+signal level_stars_changed
+
+## Best stars earned for a level (0 when never attempted).
+func best_stars_for(level: int) -> int:
+	return int(best_stars.get(level, 0))
+
+## Keeps the highest star count achieved for a level and emits on improvement.
+func record_level_result(level: int, stars: int) -> void:
+	if stars > best_stars_for(level):
+		best_stars[level] = stars
+		level_stars_changed.emit()
+
+## A level is playable when it is the first level or the previous level earned
+## at least one star.
+func level_unlocked(level: int) -> bool:
+	return level <= 1 or best_stars_for(level - 1) >= 1
+
 ## Adds resources and emits the change.
 func add_resources(amount_gold: int, amount_elixir: int) -> void:
 	gold += amount_gold

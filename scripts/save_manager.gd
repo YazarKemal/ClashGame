@@ -41,6 +41,7 @@ func save_game(manager: BuildingManager) -> void:
 		"resources": {"gold": GameManager.gold, "elixir": GameManager.elixir},
 		"buildings": buildings,
 		"army_data": GameManager.army_data,
+		"level_stars": GameManager.best_stars,
 		"last_saved_time": int(Time.get_unix_time_from_system()),
 	}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
@@ -71,6 +72,7 @@ func load_game(manager: BuildingManager) -> bool:
 
 	_restore_army(data.get("army_data", {}))
 	GameManager.army_changed.emit()
+	_restore_stars(data.get("level_stars", {}))
 
 	for entry in data.get("buildings", []):
 		if typeof(entry) != TYPE_DICTIONARY:
@@ -91,6 +93,13 @@ func _restore_army(raw_army: Dictionary) -> void:
 	for k in raw_army:
 		GameManager.army_data[int(k)] = int(raw_army[k])
 
+## Restores the best-stars map, converting the string keys JSON produces back
+## to integers.
+func _restore_stars(raw_stars: Dictionary) -> void:
+	GameManager.best_stars = {}
+	for k in raw_stars:
+		GameManager.best_stars[int(k)] = int(raw_stars[k])
+
 ## Rewrites only the resources in the existing save file, leaving the saved
 ## buildings untouched. Used when returning from a raid: the player's vault is
 ## updated (troop costs spent, loot gained) and persisted without letting the
@@ -104,6 +113,7 @@ func save_resources_only() -> void:
 		return
 	data["resources"] = {"gold": GameManager.gold, "elixir": GameManager.elixir}
 	data["army_data"] = GameManager.army_data
+	data["level_stars"] = GameManager.best_stars
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f != null:
 		f.store_string(JSON.stringify(data, "\t"))
@@ -122,6 +132,8 @@ func reset_village(manager: BuildingManager) -> void:
 	GameManager.resource_changed.emit(500, 500)
 	GameManager.army_data = {}
 	GameManager.army_changed.emit()
+	GameManager.best_stars = {}
+	GameManager.level_stars_changed.emit()
 	if FileAccess.file_exists(SAVE_PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
 	_init_default_village(manager)

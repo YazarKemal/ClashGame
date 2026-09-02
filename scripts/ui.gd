@@ -41,8 +41,15 @@ var manager: BuildingManager
 @onready var archer_train_button: Button = $TrainWindow/Margin/VBox/ArcherTrainButton
 @onready var giant_train_button: Button = $TrainWindow/Margin/VBox/GiantTrainButton
 @onready var close_train_button: Button = $TrainWindow/Margin/VBox/CloseTrainButton
+@onready var campaign_panel: PanelContainer = $CampaignPanel
+@onready var level1_button: Button = $CampaignPanel/Margin/VBox/Level1Button
+@onready var level2_button: Button = $CampaignPanel/Margin/VBox/Level2Button
+@onready var level3_button: Button = $CampaignPanel/Margin/VBox/Level3Button
+@onready var saldir_button: Button = $CampaignPanel/Margin/VBox/HBox/SaldirButton
+@onready var geri_button: Button = $CampaignPanel/Margin/VBox/HBox/GeriButton
 
 var _selected_building: Building = null
+var _selected_level := 1
 
 func _ready() -> void:
 	manager = get_node(manager_path)
@@ -73,6 +80,11 @@ func _ready() -> void:
 	barbar_button.pressed.connect(_on_barbar_pressed)
 	archer_button.pressed.connect(_on_archer_pressed)
 	giant_button.pressed.connect(_on_giant_pressed)
+	level1_button.pressed.connect(_select_level.bind(1))
+	level2_button.pressed.connect(_select_level.bind(2))
+	level3_button.pressed.connect(_select_level.bind(3))
+	saldir_button.pressed.connect(_on_saldir_pressed)
+	geri_button.pressed.connect(_on_campaign_geri_pressed)
 
 	manager.building_selected.connect(_on_building_selected)
 
@@ -82,9 +94,11 @@ func _ready() -> void:
 	building_panel.hide()
 	train_window.hide()
 	troop_bar.hide()
+	campaign_panel.hide()
 
 	GameManager.resource_changed.connect(_update_resources)
 	GameManager.army_changed.connect(_refresh_troop_bar)
+	GameManager.level_stars_changed.connect(_refresh_campaign)
 	_update_resources(GameManager.gold, GameManager.elixir)
 	_refresh_troop_bar()
 
@@ -112,10 +126,50 @@ func _on_deploy_pressed() -> void:
 func _on_reset_pressed() -> void:
 	SaveManager.reset_village(manager)
 
-## Saves the current village, then switches to the raid scene.
+## Opens the campaign selection panel instead of jumping straight into a raid.
 func _on_attack_pressed() -> void:
+	build_button.hide()
+	build_menu.hide()
+	campaign_panel.show()
+	_refresh_campaign()
+
+## Selects a playable campaign level (locked levels ignore the tap).
+func _select_level(level: int) -> void:
+	if not GameManager.level_unlocked(level):
+		return
+	_selected_level = level
+	_refresh_campaign()
+
+## Rebuilds the level list: name + best-star row, locked when the previous
+## level has no star, and a highlight on the selected entry.
+func _refresh_campaign() -> void:
+	var names: Array = RaidManager.level_names()
+	for i in range(3):
+		var level := i + 1
+		var btn: Button = [level1_button, level2_button, level3_button][i]
+		if GameManager.level_unlocked(level):
+			var stars := GameManager.best_stars_for(level)
+			btn.text = "Seviye %d: %s  %s" % [level, names[i],
+					"★".repeat(stars) + "☆".repeat(maxi(3 - stars, 0))]
+			btn.disabled = false
+		else:
+			btn.text = "Seviye %d: %s  🔒" % [level, names[i]]
+			btn.disabled = true
+		btn.modulate = Color(1, 1, 1, 1) if level == _selected_level \
+				else Color(0.75, 0.75, 0.75, 1)
+
+## Saves the village and launches the selected level's raid.
+func _on_saldir_pressed() -> void:
+	if not GameManager.level_unlocked(_selected_level):
+		return
+	GameManager.selected_level = _selected_level
 	SaveManager.save_game(manager)
 	get_tree().change_scene_to_file("res://scenes/raid.tscn")
+
+## Closes the campaign panel and returns to the village controls.
+func _on_campaign_geri_pressed() -> void:
+	campaign_panel.hide()
+	build_button.show()
 
 func _close_build_menu() -> void:
 	build_menu.hide()
@@ -161,6 +215,7 @@ func _on_placement_started() -> void:
 	cancel_button.show()
 	troop_bar.hide()
 	train_window.hide()
+	campaign_panel.hide()
 
 func _on_placement_ended(_success: bool) -> void:
 	confirm_button.hide()

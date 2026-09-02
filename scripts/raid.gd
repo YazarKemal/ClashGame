@@ -7,16 +7,6 @@ extends Node2D
 
 const MAIN_SCENE := "res://scenes/main.tscn"
 
-const TOTAL_POOL_GOLD := 500
-const TOTAL_POOL_ELIXIR := 500
-
-## Walls forming a loose ring around the enemy core.
-const RING_WALLS := [
-	Vector2i(14, 14), Vector2i(23, 14), Vector2i(14, 23), Vector2i(23, 23),
-	Vector2i(14, 18), Vector2i(23, 18), Vector2i(18, 14), Vector2i(18, 23),
-	Vector2i(14, 16), Vector2i(14, 20), Vector2i(23, 16), Vector2i(23, 20),
-]
-
 @onready var manager: BuildingManager = $BuildingManager
 ## Untyped so raid_ui.gd's script methods resolve at runtime.
 @onready var ui = $RaidUI
@@ -26,39 +16,39 @@ var destroyed_count := 0
 var gained_gold := 0
 var gained_elixir := 0
 var battle_over := false
+var _current_level := 1
+var _last_stars := 0
 var _town_hall_destroyed := false
 var _troops_deployed := false
 var _check_timer: Timer = null
 
 func _ready() -> void:
 	GameManager.in_raid = true
+	_current_level = GameManager.selected_level
 	_build_enemy_village()
 	manager.deploy_only_on_border = true
 	manager.set_spawn_mode(true)
 	manager.unit_spawned.connect(_on_unit_spawned)
 	ui.setup(self, manager)
-	ui.set_loot_pool(TOTAL_POOL_GOLD, TOTAL_POOL_ELIXIR)
+	var level: Dictionary = RaidManager.level_data(_current_level)
+	ui.set_loot_pool(level["loot_gold"], level["loot_elixir"])
 	_setup_check_timer()
 
 func _on_unit_spawned() -> void:
 	_troops_deployed = true
 
-## Builds the fixed enemy layout and assigns the shared loot pool to its
+## Builds the selected level's enemy layout and assigns its loot pool to the
 ## buildings so destroyed buildings drop their share.
 func _build_enemy_village() -> void:
-	# Mine: 250G. Elixir collector: 250E. Town Hall: the remainder (250G/250E).
-	# Towers and walls hold no loot. Totals to 500G / 500E.
-	_spawn(Building.Type.TOWN_HALL, Vector2i(18, 18), 250, 250)
-	_spawn(Building.Type.TOWER, Vector2i(15, 18), 0, 0)
-	_spawn(Building.Type.TOWER, Vector2i(21, 18), 0, 0)
-	_spawn(Building.Type.MINE, Vector2i(18, 15), 250, 0)
-	_spawn(Building.Type.ELIXIR_COLLECTOR, Vector2i(18, 21), 0, 250)
-	for w in RING_WALLS:
-		_spawn(Building.Type.WALL, w, 0, 0)
+	var level: Dictionary = RaidManager.level_data(_current_level)
+	for spawn in level["spawns"]:
+		var s: Dictionary = spawn
+		_spawn(s["type"], s["cell"], s["loot_g"], s["loot_e"], int(s["level"]))
 
 ## Instantiates an enemy building at `cell`, fills the occupied grid and hooks
 ## its destruction so its loot is credited to the attacker.
-func _spawn(btype: Building.Type, cell: Vector2i, loot_g: int, loot_e: int) -> void:
+func _spawn(btype: Building.Type, cell: Vector2i, loot_g: int, loot_e: int,
+		blevel: int) -> void:
 	if not manager.can_place_at(cell, Building.DATA[btype]["size"]):
 		return
 	var b: Building = manager.BUILDING_SCENE.instantiate()
@@ -67,10 +57,26 @@ func _spawn(btype: Building.Type, cell: Vector2i, loot_g: int, loot_e: int) -> v
 	b.loot_elixir = loot_e
 	manager.add_child(b)
 	b.place_at(cell)
+	_apply_level(b, btype, blevel)
 	b.destroyed.connect(_on_enemy_destroyed.bind(loot_g, loot_e, btype))
 	for c in b.cells:
 		manager.occupied[c] = true
 	total_buildings += 1
+
+## Scales a freshly placed enemy building up to its template level, matching
+## the player's own upgrade multipliers so higher levels are visibly tougher.
+func _apply_level(b: Building, btype: Building.Type, blevel: int) -> void:
+	for i in range(1, blevel):
+		b.max_hp = int(b.max_hp * 1.4)
+		if btype == Building.Type.TOWER:
+			b.attack_damage = int(b.attack_damage * 1.4)
+			b.attack_range = b.attack_range * 1.1
+		elif btype == Building.Type.MINE:
+			b.gold_per_sec = int(b.gold_per_sec * 1.4)
+		elif btype == Building.Type.ELIXIR_COLLECTOR:
+			b.elixir_per_sec = int(b.elixir_per_sec * 1.5)
+	b.hp = b.max_hp
+	b._apply_hp_bar()
 
 func _on_enemy_destroyed(_cells: Array, loot_g: int, loot_e: int, btype: Building.Type) -> void:
 	if battle_over:
@@ -124,6 +130,7 @@ func _end_battle() -> void:
 	if total_buildings > 0:
 		pct = int(round(100.0 * destroyed_count / total_buildings))
 	var stars := _compute_stars(pct, destroyed_count >= total_buildings)
+	_last_stars = stars
 	ui.show_result(pct, stars, gained_gold, gained_elixir)
 
 ## 1 star for 50%+ destruction, 1 for the Town Hall, 1 for a full clear (max 3).
@@ -141,6 +148,7 @@ func _compute_stars(pct: int, full_clear: bool) -> int:
 ## updated vault without altering the saved main-village buildings.
 func _return_home() -> void:
 	GameManager.in_raid = false
+	GameManager.record_level_result(_current_level, _last_stars)
 	GameManager.add_resources(gained_gold, gained_elixir)
 	SaveManager.save_resources_only()
 	get_tree().change_scene_to_file(MAIN_SCENE)
