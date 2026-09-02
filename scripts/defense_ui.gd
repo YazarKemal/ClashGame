@@ -14,6 +14,9 @@ var _director = null   # untyped: DefenseDirector signals resolve at runtime
 
 var _total_enemies := 9
 var _townhall_alive := true
+# Previous HUD values, so micro-pulses fire only on a real change.
+var _last_destruct := 0
+var _last_enemy := 9
 
 # Top HUD
 var _enemy_label: Label
@@ -45,9 +48,15 @@ func setup(defense: Node, director: Node) -> void:
 func _on_enemy_count(current: int, total: int) -> void:
 	_total_enemies = total
 	_enemy_label.text = "DÜŞMAN: %d/%d" % [current, total]
+	if current < _last_enemy:
+		_pulse_label(_enemy_label, 1.08)
+	_last_enemy = current
 
 func _on_destruction(percent: int) -> void:
 	_destruct_label.text = "YIKIM: %d%%" % percent
+	if percent > _last_destruct:
+		_pulse_label(_destruct_label, 1.06)
+	_last_destruct = percent
 
 func _on_townhall(alive: bool) -> void:
 	_townhall_alive = alive
@@ -100,6 +109,18 @@ func _show_result(won: bool, result: Dictionary) -> void:
 
 func _on_return_pressed() -> void:
 	_defense.return_to_village()
+
+## A brief, subtle scale pulse on a HUD label so a counter change is confirmed
+## without shaking the screen. Scales about the label's centre.
+func _pulse_label(l: Label, to: float) -> void:
+	if l == null:
+		return
+	l.pivot_offset = l.size * 0.5
+	var tw := create_tween()
+	tw.tween_property(l, "scale", Vector2(to, to), 0.08) \
+			.set_trans(Tween.TRANS_QUAD)
+	tw.tween_property(l, "scale", Vector2.ONE, 0.1) \
+			.set_trans(Tween.TRANS_QUAD)
 
 # --- UI construction ---------------------------------------------------------
 

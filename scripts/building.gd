@@ -126,6 +126,10 @@ var _attack_timer: Timer = null
 var _ring: Line2D = null
 var _ring_tween: Tween = null
 
+# Guards the hit scale-punch so a burst of simultaneous attacks reads as one
+# punch instead of a jittering body.
+var _punch_active := false
+
 func _ready() -> void:
 	_apply_def(DATA[building_type])
 	_label.text = building_name
@@ -282,6 +286,7 @@ func take_damage(amount: int) -> void:
 	FxManager.float_text(global_position + Vector2(0, -18), "-%d" % amount,
 			Color(1.0, 0.4, 0.3, 1.0))
 	_flash_hit()
+	_punch_hit()
 	_apply_hp_bar()
 	hp_changed.emit(maxi(hp, 0), max_hp)
 	if hp <= 0:
@@ -302,6 +307,23 @@ func _flash_hit() -> void:
 	var tw := create_tween()
 	tw.tween_property(_body, "color", _base_color, 0.1)
 
+## A tiny, guarded scale punch so hits land without jittering under a barrage.
+## Scales only the body (never the HP bar/label) and is skipped if one is
+## already in flight.
+func _punch_hit() -> void:
+	if _body == null or _punch_active:
+		return
+	_punch_active = true
+	var tw := create_tween()
+	tw.tween_property(_body, "scale", Vector2(1.05, 1.05), 0.05) \
+			.set_trans(Tween.TRANS_QUAD)
+	tw.tween_property(_body, "scale", Vector2.ONE, 0.08) \
+			.set_trans(Tween.TRANS_QUAD)
+	tw.tween_callback(_clear_punch)
+
+func _clear_punch() -> void:
+	_punch_active = false
+
 ## Pulsing scale + alpha flash so a successful upgrade is clearly visible.
 func _flash_upgrade() -> void:
 	var tw := create_tween()
@@ -313,9 +335,18 @@ func _flash_upgrade() -> void:
 func _die() -> void:
 	_spawn_collapse()
 	_emit_loot_text()
-	# Big defensive collapses shake the screen so the moment lands.
-	if building_type == Type.TOWER or building_type == Type.TOWN_HALL:
-		FxManager.shake_cam(6.0, 0.35)
+	# Destruction shake, tiered by importance. Walls are excluded (troops shatter
+	# many of them, so shaking each would nauseate); the trauma-style camera
+	# raises amplitude if several collapse together.
+	match building_type:
+		Type.WALL:
+			pass
+		Type.TOWN_HALL:
+			FxManager.shake_cam(8.0, 0.4)
+		Type.TOWER:
+			FxManager.shake_cam(5.0, 0.3)
+		_:
+			FxManager.shake_cam(3.0, 0.25)
 	remove_from_group("buildings")
 	destroyed.emit(cells)
 	queue_free()

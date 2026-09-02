@@ -39,8 +39,14 @@ func _ready() -> void:
 	# Wire the UI BEFORE initialize so it catches the director's synchronous
 	# battle_started/state emissions and is ready to mirror live state.
 	ui.setup(self, director)
+	# A small camera bump on launch signals the fight is starting, without a
+	# cinematic or any gameplay effect.
+	director.battle_started.connect(_on_battle_started)
 	# Clone is ready; hand the village to the director to start the AI attack.
 	director.initialize(manager)
+
+func _on_battle_started() -> void:
+	FxManager.shake_cam(1.5, 0.2)
 
 ## Leaves the disposable battle scene back to the real village. No save, no
 ## damage persistence, no reward — _exit_tree restores in_raid automatically.
