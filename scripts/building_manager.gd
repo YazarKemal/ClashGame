@@ -6,6 +6,8 @@ class_name BuildingManager
 signal placement_started
 signal placement_ended(success: bool)
 
+const BUILDING_SCENE: PackedScene = preload("res://scenes/building.tscn")
+
 var occupied: Dictionary = {}  # Vector2i -> true
 
 var placing := false
@@ -28,12 +30,11 @@ func can_place_at(cell_top_left: Vector2i, grid_size: int) -> bool:
 				return false
 	return true
 
-func start_placement(building_scene: PackedScene, building_name: String, grid_size: int) -> void:
+func start_placement(building_type: Building.Type) -> void:
 	if placing:
 		cancel_placement()
-	var b: Building = building_scene.instantiate()
-	b.building_name = building_name
-	b.grid_size = grid_size
+	var b: Building = BUILDING_SCENE.instantiate()
+	b.building_type = building_type
 	add_child(b)
 	_preview = b
 	_preview_cell = GridConfig.world_to_cell(get_global_mouse_position())
@@ -45,6 +46,9 @@ func confirm_placement() -> bool:
 	if not placing or _preview == null:
 		return false
 	if not can_place_at(_preview_cell, _preview.grid_size):
+		return false
+	# Never confirm unless the player can afford the building's cost.
+	if not GameManager.spend_resources(_preview.gold_cost(), _preview.elixir_cost()):
 		return false
 	_place_preview()
 	placing = false

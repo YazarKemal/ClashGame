@@ -11,6 +11,76 @@ bg_color = Color(0.72, 0.18, 0.18, 1)
 [node name="UI" type="CanvasLayer"]
 script = ExtResource("1_ui")
 
+[node name="TopBar" type="PanelContainer" parent="."]
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 56.0
+grow_horizontal = 2
+
+[node name="Margin" type="MarginContainer" parent="TopBar"]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 12
+
+[node name="HBox" type="HBoxContainer" parent="TopBar/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="GoldLabel" type="Label" parent="TopBar/Margin/HBox"]
+layout_mode = 2
+text = "Altın: 500"
+
+[node name="Sep" type="Label" parent="TopBar/Margin/HBox"]
+layout_mode = 2
+text = "|"
+
+[node name="ElixirLabel" type="Label" parent="TopBar/Margin/HBox"]
+layout_mode = 2
+text = "İksir: 500"
+
+[node name="BuildMenu" type="PanelContainer" parent="."]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Margin" type="MarginContainer" parent="BuildMenu"]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="VBox" type="VBoxContainer" parent="BuildMenu/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="TowerButton" type="Button" parent="BuildMenu/Margin/VBox"]
+custom_minimum_size = Vector2(200, 60)
+layout_mode = 2
+text = "Kule (100 G)"
+
+[node name="MineButton" type="Button" parent="BuildMenu/Margin/VBox"]
+custom_minimum_size = Vector2(200, 60)
+layout_mode = 2
+text = "Maden (80 E)"
+
+[node name="TownHallButton" type="Button" parent="BuildMenu/Margin/VBox"]
+custom_minimum_size = Vector2(200, 60)
+layout_mode = 2
+text = "Belediye (250 G)"
+
+[node name="CloseMenuButton" type="Button" parent="BuildMenu/Margin/VBox"]
+custom_minimum_size = Vector2(200, 60)
+layout_mode = 2
+text = "Kapat"
+
 [node name="BuildButton" type="Button" parent="."]
 custom_minimum_size = Vector2(120, 60)
 anchors_preset = 2
