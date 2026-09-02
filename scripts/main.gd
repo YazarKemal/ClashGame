@@ -8,6 +8,7 @@ extends Node2D
 var _autosave_timer: Timer
 
 func _ready() -> void:
+	GameManager.in_raid = false
 	SaveManager.load_game(manager)
 	_autosave_timer = Timer.new()
 	_autosave_timer.wait_time = 30.0

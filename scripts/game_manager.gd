@@ -8,6 +8,10 @@ signal resource_changed(gold: int, elixir: int)
 var gold := 500
 var elixir := 500
 
+## True while the player is raiding an enemy village. Disables enemy resource
+## production so raid buildings never credit the player's real vault.
+var in_raid := false
+
 ## Adds resources and emits the change.
 func add_resources(amount_gold: int, amount_elixir: int) -> void:
 	gold += amount_gold

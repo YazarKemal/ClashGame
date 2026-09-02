@@ -6,6 +6,7 @@ class_name BuildingManager
 signal placement_started
 signal placement_ended(success: bool)
 signal building_selected(building: Building)
+signal unit_spawned
 
 const BUILDING_SCENE: PackedScene = preload("res://scenes/building.tscn")
 const UNIT_SCENE: PackedScene = preload("res://scenes/unit.tscn")
@@ -17,6 +18,10 @@ const SELECT_TAP_DIST := 15.0
 var placing := false
 var spawn_mode := false
 var selected_unit_type := Unit.Type.BARBARIAN
+
+## When true, troops can only be deployed on the outer ring of grid cells
+## (used in raid mode so attackers start at the village boundary).
+var deploy_only_on_border := false
 var _preview: Building = null
 var _preview_cell := Vector2i.ZERO
 var _selected: Building = null
@@ -141,6 +146,10 @@ func _on_selected_destroyed(_cells: Array) -> void:
 ## Deploys the currently selected troop at the tap point, charging its elixir
 ## cost first (nothing spawns when the player cannot afford it).
 func _spawn_unit_at() -> void:
+	if deploy_only_on_border and not _is_border_cell(
+			GridConfig.world_to_cell(get_global_mouse_position())):
+		print("Asker sadece harita sınırlarına bırakılabilir.")
+		return
 	var cost := Unit.cost_for(selected_unit_type)
 	if not GameManager.spend_resources(0, cost):
 		print("Yetersiz İksir: %d" % cost)
@@ -149,6 +158,12 @@ func _spawn_unit_at() -> void:
 	u.unit_type = selected_unit_type
 	u.position = get_global_mouse_position()
 	add_child(u)
+	unit_spawned.emit()
+
+## True when the cell lies on the outer edge of the village grid.
+func _is_border_cell(c: Vector2i) -> bool:
+	return c.x == 0 or c.y == 0 \
+			or c.x == GridConfig.GRID_SIZE - 1 or c.y == GridConfig.GRID_SIZE - 1
 
 func _on_building_destroyed(cells: Array) -> void:
 	for c in cells:

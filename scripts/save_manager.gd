@@ -76,6 +76,23 @@ func load_game(manager: BuildingManager) -> bool:
 		_spawn_building(manager, type, cell, level, hp)
 	return true
 
+## Rewrites only the resources in the existing save file, leaving the saved
+## buildings untouched. Used when returning from a raid: the player's vault is
+## updated (troop costs spent, loot gained) and persisted without letting the
+## enemy village leak into the main village save.
+func save_resources_only() -> void:
+	if not FileAccess.file_exists(SAVE_PATH):
+		return
+	var raw := FileAccess.get_file_as_string(SAVE_PATH)
+	var data: Variant = JSON.parse_string(raw)
+	if typeof(data) != TYPE_DICTIONARY:
+		return
+	data["resources"] = {"gold": GameManager.gold, "elixir": GameManager.elixir}
+	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	if f != null:
+		f.store_string(JSON.stringify(data, "\t"))
+		f.close()
+
 ## Destroys all buildings, clears the grid and resources, removes the save
 ## file, then reseeds a fresh village so the load path can be tested.
 func reset_village(manager: BuildingManager) -> void:

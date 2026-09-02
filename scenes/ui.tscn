@@ -107,6 +107,19 @@ grow_horizontal = 0
 mouse_filter = 0
 text = "Köyü Sıfırla"
 
+[node name="AttackButton" type="Button" parent="."]
+custom_minimum_size = Vector2(160, 60)
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 40.0
+offset_top = -90.0
+offset_right = 200.0
+offset_bottom = -30.0
+grow_vertical = 0
+mouse_filter = 0
+text = "Savaşa Git!"
+
 [node name="DeployButton" type="Button" parent="."]
 custom_minimum_size = Vector2(160, 60)
 anchors_preset = 0

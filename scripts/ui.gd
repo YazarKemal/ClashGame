@@ -11,6 +11,7 @@ var manager: BuildingManager
 @onready var build_button: Button = $BuildButton
 @onready var deploy_button: Button = $DeployButton
 @onready var reset_button: Button = $ResetButton
+@onready var attack_button: Button = $AttackButton
 @onready var build_menu: PanelContainer = $BuildMenu
 @onready var tower_button: Button = $BuildMenu/Margin/VBox/TowerButton
 @onready var mine_button: Button = $BuildMenu/Margin/VBox/MineButton
@@ -42,6 +43,7 @@ func _ready() -> void:
 	build_button.pressed.connect(_on_build_pressed)
 	deploy_button.pressed.connect(_on_deploy_pressed)
 	reset_button.pressed.connect(_on_reset_pressed)
+	attack_button.pressed.connect(_on_attack_pressed)
 	tower_button.pressed.connect(_start_tower_placement)
 	mine_button.pressed.connect(_start_mine_placement)
 	town_hall_button.pressed.connect(_start_town_hall_placement)
@@ -90,6 +92,11 @@ func _on_deploy_pressed() -> void:
 
 func _on_reset_pressed() -> void:
 	SaveManager.reset_village(manager)
+
+## Saves the current village, then switches to the raid scene.
+func _on_attack_pressed() -> void:
+	SaveManager.save_game(manager)
+	get_tree().change_scene_to_file("res://scenes/raid.tscn")
 
 func _close_build_menu() -> void:
 	build_menu.hide()

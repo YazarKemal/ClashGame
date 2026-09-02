@@ -1,0 +1,124 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/raid_ui.gd" id="1_ui"]
+
+[node name="RaidUI" type="CanvasLayer"]
+script = ExtResource("1_ui")
+
+[node name="TopBar" type="PanelContainer" parent="."]
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 56.0
+grow_horizontal = 2
+
+[node name="Margin" type="MarginContainer" parent="TopBar"]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 12
+
+[node name="HBox" type="HBoxContainer" parent="TopBar/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PoolLabel" type="Label" parent="TopBar/Margin/HBox"]
+layout_mode = 2
+text = "Havuz: 500 G / 500 İ"
+
+[node name="Sep" type="Label" parent="TopBar/Margin/HBox"]
+layout_mode = 2
+text = "|"
+
+[node name="GainedLabel" type="Label" parent="TopBar/Margin/HBox"]
+layout_mode = 2
+text = "Kazanılan: 0 G / 0 İ"
+
+[node name="EndBattleButton" type="Button" parent="."]
+custom_minimum_size = Vector2(180, 60)
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -220.0
+offset_top = 64.0
+offset_right = -40.0
+offset_bottom = 124.0
+grow_horizontal = 0
+mouse_filter = 0
+text = "Savaşı Bitir"
+
+[node name="TroopBar" type="HBoxContainer" parent="."]
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -240.0
+offset_top = -90.0
+offset_right = 240.0
+offset_bottom = -40.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_constants/separation = 8
+
+[node name="BarbarButton" type="Button" parent="TroopBar"]
+custom_minimum_size = Vector2(150, 56)
+layout_mode = 2
+text = "Barbar (15 İ)"
+
+[node name="ArcherButton" type="Button" parent="TroopBar"]
+custom_minimum_size = Vector2(150, 56)
+layout_mode = 2
+text = "Okçu (25 İ)"
+
+[node name="GiantButton" type="Button" parent="TroopBar"]
+custom_minimum_size = Vector2(150, 56)
+layout_mode = 2
+text = "Dev (80 İ)"
+
+[node name="ResultWindow" type="PanelContainer" parent="."]
+visible = false
+custom_minimum_size = Vector2(340, 0)
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Margin" type="MarginContainer" parent="ResultWindow"]
+layout_mode = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 16
+
+[node name="VBox" type="VBoxContainer" parent="ResultWindow/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="TitleLabel" type="Label" parent="ResultWindow/Margin/VBox"]
+layout_mode = 2
+horizontal_alignment = 1
+text = "Savaş Bitti"
+
+[node name="DestructionLabel" type="Label" parent="ResultWindow/Margin/VBox"]
+layout_mode = 2
+horizontal_alignment = 1
+text = "Yıkım: 0%"
+
+[node name="StarsLabel" type="Label" parent="ResultWindow/Margin/VBox"]
+layout_mode = 2
+horizontal_alignment = 1
+text = "Yıldız: ☆☆☆"
+
+[node name="LootLabel" type="Label" parent="ResultWindow/Margin/VBox"]
+layout_mode = 2
+horizontal_alignment = 1
+text = "Ganimet: 0 G / 0 İ"
+
+[node name="ReturnHomeButton" type="Button" parent="ResultWindow/Margin/VBox"]
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+text = "Köye Dön"

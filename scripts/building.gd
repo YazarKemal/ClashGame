@@ -90,6 +90,11 @@ var attack_damage := ATTACK_DAMAGE
 var attack_range := ATTACK_RANGE
 var _base_color := Color(0.55, 0.6, 0.7, 1.0)
 
+## Loot yielded to the attacker when this building is destroyed in a raid.
+## Zero for the player's own village buildings.
+var loot_gold := 0
+var loot_elixir := 0
+
 var _timer: Timer = null
 var _attack_timer: Timer = null
 
@@ -275,6 +280,8 @@ func _start_production() -> void:
 	_timer.timeout.connect(_produce)
 
 func _produce() -> void:
+	if GameManager.in_raid:
+		return
 	if gold_per_sec <= 0 and elixir_per_sec <= 0:
 		return
 	GameManager.add_resources(gold_per_sec, elixir_per_sec)
