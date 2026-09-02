@@ -9,6 +9,7 @@ extends CanvasLayer
 var manager: BuildingManager
 
 @onready var build_button: Button = $BuildButton
+@onready var deploy_button: Button = $DeployButton
 @onready var build_menu: PanelContainer = $BuildMenu
 @onready var tower_button: Button = $BuildMenu/Margin/VBox/TowerButton
 @onready var mine_button: Button = $BuildMenu/Margin/VBox/MineButton
@@ -25,6 +26,7 @@ func _ready() -> void:
 	manager.placement_ended.connect(_on_placement_ended)
 
 	build_button.pressed.connect(_on_build_pressed)
+	deploy_button.pressed.connect(_on_deploy_pressed)
 	tower_button.pressed.connect(_start_tower_placement)
 	mine_button.pressed.connect(_start_mine_placement)
 	town_hall_button.pressed.connect(_start_town_hall_placement)
@@ -46,6 +48,14 @@ func _update_resources(gold: int, elixir: int) -> void:
 func _on_build_pressed() -> void:
 	build_button.hide()
 	build_menu.show()
+
+func _on_deploy_pressed() -> void:
+	if manager.spawn_mode:
+		manager.set_spawn_mode(false)
+		deploy_button.text = "Asker Bırak"
+	else:
+		manager.set_spawn_mode(true)
+		deploy_button.text = "Kapat"
 
 func _close_build_menu() -> void:
 	build_menu.hide()

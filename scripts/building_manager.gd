@@ -7,10 +7,12 @@ signal placement_started
 signal placement_ended(success: bool)
 
 const BUILDING_SCENE: PackedScene = preload("res://scenes/building.tscn")
+const UNIT_SCENE: PackedScene = preload("res://scenes/unit.tscn")
 
 var occupied: Dictionary = {}  # Vector2i -> true
 
 var placing := false
+var spawn_mode := false
 var _preview: Building = null
 var _preview_cell := Vector2i.ZERO
 
@@ -33,14 +35,19 @@ func can_place_at(cell_top_left: Vector2i, grid_size: int) -> bool:
 func start_placement(building_type: Building.Type) -> void:
 	if placing:
 		cancel_placement()
+	spawn_mode = false
 	var b: Building = BUILDING_SCENE.instantiate()
 	b.building_type = building_type
+	b.destroyed.connect(_on_building_destroyed)
 	add_child(b)
 	_preview = b
 	_preview_cell = GridConfig.world_to_cell(get_global_mouse_position())
 	placing = true
 	_apply_preview_validity()
 	placement_started.emit()
+
+func set_spawn_mode(on: bool) -> void:
+	spawn_mode = on
 
 func confirm_placement() -> bool:
 	if not placing or _preview == null:
@@ -65,15 +72,29 @@ func cancel_placement() -> void:
 	placement_ended.emit(false)
 
 func _unhandled_input(event: InputEvent) -> void:
+	if not (event is InputEventScreenTouch or event is InputEventScreenDrag):
+		return
+	if spawn_mode and not placing:
+		if event is InputEventScreenTouch and event.pressed:
+			_spawn_unit_at(event.position)
+		return
 	if not placing or _preview == null:
 		return
 	# Only move the preview from real map touches/drags, never from UI presses.
-	var drag: InputEventScreenDrag = event as InputEventScreenDrag
-	var touch: InputEventScreenTouch = event as InputEventScreenTouch
-	if drag != null:
-		_move_preview_to(drag.position)
-	elif touch != null and touch.pressed:
-		_move_preview_to(touch.position)
+	if event is InputEventScreenDrag:
+		_move_preview_to(event.position)
+	elif event is InputEventScreenTouch and event.pressed:
+		_move_preview_to(event.position)
+
+func _spawn_unit_at(screen_pos: Vector2) -> void:
+	var world := get_global_transform_with_canvas().affine_inverse() * screen_pos
+	var u: Node2D = UNIT_SCENE.instantiate()
+	u.position = world
+	add_child(u)
+
+func _on_building_destroyed(cells: Array) -> void:
+	for c in cells:
+		occupied.erase(c)
 
 func _move_preview_to(screen_pos: Vector2) -> void:
 	# Convert the viewport/screen point into world space (accounts for the
@@ -92,6 +113,5 @@ func _apply_preview_validity() -> void:
 func _place_preview() -> void:
 	var b := _preview
 	b.place_at(_preview_cell)
-	for dx in range(b.grid_size):
-		for dy in range(b.grid_size):
-			occupied[b.cell + Vector2i(dx, dy)] = true
+	for c in b.cells:
+		occupied[c] = true
