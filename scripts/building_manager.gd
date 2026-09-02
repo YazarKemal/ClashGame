@@ -68,6 +68,7 @@ func confirm_placement() -> bool:
 	_place_preview()
 	placing = false
 	_preview = null
+	SaveManager.save_game(self)
 	placement_ended.emit(true)
 	return true
 

@@ -10,6 +10,7 @@ var manager: BuildingManager
 
 @onready var build_button: Button = $BuildButton
 @onready var deploy_button: Button = $DeployButton
+@onready var reset_button: Button = $ResetButton
 @onready var build_menu: PanelContainer = $BuildMenu
 @onready var tower_button: Button = $BuildMenu/Margin/VBox/TowerButton
 @onready var mine_button: Button = $BuildMenu/Margin/VBox/MineButton
@@ -40,6 +41,7 @@ func _ready() -> void:
 
 	build_button.pressed.connect(_on_build_pressed)
 	deploy_button.pressed.connect(_on_deploy_pressed)
+	reset_button.pressed.connect(_on_reset_pressed)
 	tower_button.pressed.connect(_start_tower_placement)
 	mine_button.pressed.connect(_start_mine_placement)
 	town_hall_button.pressed.connect(_start_town_hall_placement)
@@ -85,6 +87,9 @@ func _on_deploy_pressed() -> void:
 		deploy_button.text = "Kapat"
 		troop_bar.show()
 		_refresh_troop_bar()
+
+func _on_reset_pressed() -> void:
+	SaveManager.reset_village(manager)
 
 func _close_build_menu() -> void:
 	build_menu.hide()
@@ -179,7 +184,9 @@ func _can_afford(b: Building) -> bool:
 func _on_upgrade_pressed() -> void:
 	if _selected_building == null:
 		return
-	if not _selected_building.upgrade():
+	if _selected_building.upgrade():
+		SaveManager.save_game(manager)
+	else:
 		_refresh_panel()
 
 func _on_close_panel() -> void:
