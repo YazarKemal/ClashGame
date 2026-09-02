@@ -5,6 +5,19 @@ extends Node
 
 const SAVE_PATH := "user://save_game.json"
 
+## Offline production never accumulates past this many seconds, so an absent
+## player can't come back to an exploded economy after a multi-week absence.
+const MAX_OFFLINE_SECONDS := 8 * 3600  # 8 hours
+
+## Absences shorter than this are treated as "still here" (e.g. returning from
+## a raid, which rewrites last_saved_time to ~now) and earn no offline income,
+## so a sub-minute gap never spawns a pointless popup.
+const MIN_OFFLINE_SECONDS := 60
+
+## Human-readable offline report for the last load ("" when nothing earned).
+## Read by main.gd after load_game() so the village scene can show a popup.
+var offline_summary := ""
+
 ## Building.Type <-> string names for JSON-friendly storage.
 const TYPE_NAMES := {
 	Building.Type.TOWER: "tower",
@@ -55,6 +68,7 @@ func save_game(manager: BuildingManager) -> void:
 ## file was loaded; when none exists (or it is corrupt) it seeds a fresh
 ## village with a Town Hall in the center and returns false.
 func load_game(manager: BuildingManager) -> bool:
+	offline_summary = ""
 	if not FileAccess.file_exists(SAVE_PATH):
 		_init_default_village(manager)
 		return false
@@ -84,7 +98,73 @@ func load_game(manager: BuildingManager) -> bool:
 		var level := int(e.get("level", 1))
 		var hp := int(e.get("current_hp", 0))
 		_spawn_building(manager, type, cell, level, hp)
+
+	# Credit mines/collectors for the time the player was away. Buildings are
+	# restored above, so their level-scaled per-second rates are available here.
+	var last_saved := int(data.get("last_saved_time", 0))
+	var elapsed := _offline_elapsed_seconds(last_saved)
+	if elapsed >= MIN_OFFLINE_SECONDS:
+		_apply_offline_income(manager, elapsed)
 	return true
+
+## Whole seconds between `last_saved` (a Unix timestamp) and now; 0 when the
+## timestamp is missing/invalid so a fresh village never earns offline income.
+func _offline_elapsed_seconds(last_saved: int) -> int:
+	if last_saved <= 0:
+		return 0
+	return int(Time.get_unix_time_from_system()) - last_saved
+
+## Sums the level-scaled production of every active Mine/Elixir Collector over
+## the time away (capped at MAX_OFFLINE_SECONDS), credits it to the vault and
+## builds a human-readable summary shown when the village loads.
+func _apply_offline_income(manager: BuildingManager, elapsed: int) -> void:
+	var seconds := mini(elapsed, MAX_OFFLINE_SECONDS)
+	if seconds <= 0:
+		return
+	# Aggregated per-second rates across every producing building.
+	var gold_rate := 0
+	var elixir_rate := 0
+	for b in manager.get_tree().get_nodes_in_group("buildings"):
+		if b is Building:
+			gold_rate += b.gold_per_sec
+			elixir_rate += b.elixir_per_sec
+	var gold := gold_rate * seconds
+	var elixir := elixir_rate * seconds
+	if gold <= 0 and elixir <= 0:
+		return
+	GameManager.gold += gold
+	GameManager.elixir += elix
+	GameManager.resource_changed.emit(GameManager.gold, GameManager.elixir)
+
+	var lines: Array[String] = []
+	if gold > 0:
+		lines.append("Altın Madeni: +%s Altın" % _fmt_number(gold))
+	if elixir > 0:
+		lines.append("İksir Toplayıcı: +%s İksir" % _fmt_number(elixir))
+	var note := "" if elapsed <= MAX_OFFLINE_SECONDS \
+			else " (8 sa. üst sınır)"
+	offline_summary = "Köyünden ayrı kaldın: %s%s\n%s" % [
+			_fmt_duration(seconds), note, "\n".join(lines)]
+
+## Formats seconds as "X sa Y dk" (or minutes/seconds when short).
+func _fmt_duration(total_seconds: int) -> String:
+	var h := total_seconds / 3600
+	var m := (total_seconds % 3600) / 60
+	if h > 0:
+		return "%d sa %d dk" % [h, m]
+	if m > 0:
+		return "%d dk" % m
+	return "%d sn" % total_seconds
+
+## Formats a positive integer with a "." thousands separator (Turkish style).
+func _fmt_number(n: int) -> String:
+	var s := str(n)
+	var out := ""
+	for i in range(s.length() - 1, -1, -1):
+		out = s[i] + out
+		if i > 0 and (s.length() - i) % 3 == 0:
+			out = "." + out
+	return out
 
 ## Restores the trained army from the save data. JSON turns integer troop-type
 ## keys into strings, so they are converted back to ints here.
@@ -114,6 +194,9 @@ func save_resources_only() -> void:
 	data["resources"] = {"gold": GameManager.gold, "elixir": GameManager.elixir}
 	data["army_data"] = GameManager.army_data
 	data["level_stars"] = GameManager.best_stars
+	# The player is present now, so the next village load must not treat the
+	# time spent in a raid as offline absence and credit extra production.
+	data["last_saved_time"] = int(Time.get_unix_time_from_system())
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f != null:
 		f.store_string(JSON.stringify(data, "\t"))
@@ -122,6 +205,7 @@ func save_resources_only() -> void:
 ## Destroys all buildings, clears the grid and resources, removes the save
 ## file, then reseeds a fresh village so the load path can be tested.
 func reset_village(manager: BuildingManager) -> void:
+	offline_summary = ""
 	for b in manager.get_tree().get_nodes_in_group("buildings"):
 		if b is Building:
 			b.free()
@@ -142,6 +226,7 @@ func reset_village(manager: BuildingManager) -> void:
 ## Seeds a brand-new village: default resources plus one Town Hall in the
 ## center of the grid.
 func _init_default_village(manager: BuildingManager) -> void:
+	offline_summary = ""
 	GameManager.gold = 500
 	GameManager.elixir = 500
 	GameManager.resource_changed.emit(500, 500)
