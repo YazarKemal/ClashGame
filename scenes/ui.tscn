@@ -19,6 +19,7 @@ anchors_preset = 10
 anchor_right = 1.0
 offset_bottom = 56.0
 grow_horizontal = 2
+mouse_filter = 2
 
 [node name="Margin" type="MarginContainer" parent="TopBar"]
 layout_mode = 2
@@ -116,6 +117,19 @@ offset_bottom = 124.0
 grow_horizontal = 0
 mouse_filter = 0
 text = "Köyü Sıfırla"
+
+[node name="ExpeditionButton" type="Button" parent="."]
+custom_minimum_size = Vector2(160, 60)
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -200.0
+offset_top = 136.0
+offset_right = -40.0
+offset_bottom = 196.0
+grow_horizontal = 0
+mouse_filter = 0
+text = "🗺 Sefer Haritası"
 
 [node name="AttackButton" type="Button" parent="."]
 custom_minimum_size = Vector2(160, 60)

@@ -1,0 +1,144 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/world_map.gd" id="1_map"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+bg_color = Color(0.08, 0.1, 0.13, 0.94)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_attack"]
+bg_color = Color(0.72, 0.18, 0.18, 1)
+
+[node name="WorldMap" type="Node2D"]
+script = ExtResource("1_map")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(0, 0)
+zoom = Vector2(0.85, 0.85)
+
+[node name="WorldUI" type="CanvasLayer" parent="."]
+
+[node name="TopBar" type="PanelContainer" parent="WorldUI"]
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 52.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+
+[node name="Margin" type="MarginContainer" parent="WorldUI/TopBar"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 10
+
+[node name="HBox" type="HBoxContainer" parent="WorldUI/TopBar/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="TitleLabel" type="Label" parent="WorldUI/TopBar/Margin/HBox"]
+layout_mode = 2
+text = "Dünya Haritası"
+
+[node name="Sep1" type="Label" parent="WorldUI/TopBar/Margin/HBox"]
+layout_mode = 2
+text = "·"
+
+[node name="GoldLabel" type="Label" parent="WorldUI/TopBar/Margin/HBox"]
+layout_mode = 2
+text = "Altın: 500"
+
+[node name="Sep2" type="Label" parent="WorldUI/TopBar/Margin/HBox"]
+layout_mode = 2
+text = "·"
+
+[node name="ElixirLabel" type="Label" parent="WorldUI/TopBar/Margin/HBox"]
+layout_mode = 2
+text = "İksir: 500"
+
+[node name="ReturnButton" type="Button" parent="WorldUI"]
+custom_minimum_size = Vector2(150, 54)
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -170.0
+offset_top = 58.0
+offset_right = -16.0
+offset_bottom = 112.0
+grow_horizontal = 0
+mouse_filter = 0
+text = "Köye Dön"
+
+[node name="HintLabel" type="Label" parent="WorldUI"]
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -220.0
+offset_top = -40.0
+offset_right = 220.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_colors/font_color = Color(1, 1, 1, 0.85)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.8)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 15
+horizontal_alignment = 1
+vertical_alignment = 1
+mouse_filter = 2
+text = "Haritaya dokun / orduyu sürükle; şehre varınca etkileşim açılır"
+
+[node name="NodePanel" type="PanelContainer" parent="WorldUI"]
+visible = false
+custom_minimum_size = Vector2(340, 0)
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+
+[node name="Margin" type="MarginContainer" parent="WorldUI/NodePanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 14
+
+[node name="VBox" type="VBoxContainer" parent="WorldUI/NodePanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="NodeTitleLabel" type="Label" parent="WorldUI/NodePanel/Margin/VBox"]
+layout_mode = 2
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 18
+text = "Şehir"
+
+[node name="NodeDetailLabel" type="Label" parent="WorldUI/NodePanel/Margin/VBox"]
+layout_mode = 2
+autowrap_mode = 2
+text = "Detay"
+
+[node name="ActionRow" type="HBoxContainer" parent="WorldUI/NodePanel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="AttackButton" type="Button" parent="WorldUI/NodePanel/Margin/VBox/ActionRow"]
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/normal = SubResource("StyleBoxFlat_attack")
+theme_override_styles/hover = SubResource("StyleBoxFlat_attack")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_attack")
+text = "⚔ Saldır"
+
+[node name="CloseNodeButton" type="Button" parent="WorldUI/NodePanel/Margin/VBox/ActionRow"]
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Geri"

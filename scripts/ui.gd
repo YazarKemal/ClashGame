@@ -11,6 +11,7 @@ var manager: BuildingManager
 @onready var build_button: Button = $BuildButton
 @onready var deploy_button: Button = $DeployButton
 @onready var reset_button: Button = $ResetButton
+@onready var expedition_button: Button = $ExpeditionButton
 @onready var attack_button: Button = $AttackButton
 @onready var build_menu: PanelContainer = $BuildMenu
 @onready var tower_button: Button = $BuildMenu/Margin/VBox/TowerButton
@@ -59,6 +60,7 @@ func _ready() -> void:
 	build_button.pressed.connect(_on_build_pressed)
 	deploy_button.pressed.connect(_on_deploy_pressed)
 	reset_button.pressed.connect(_on_reset_pressed)
+	expedition_button.pressed.connect(_on_expedition_pressed)
 	attack_button.pressed.connect(_on_attack_pressed)
 	tower_button.pressed.connect(_start_tower_placement)
 	mine_button.pressed.connect(_start_mine_placement)
@@ -125,6 +127,14 @@ func _on_deploy_pressed() -> void:
 
 func _on_reset_pressed() -> void:
 	SaveManager.reset_village(manager)
+
+## Saves the village (so the offline timer resets), resets raid routing to the
+## campaign default, then opens the macro world map.
+func _on_expedition_pressed() -> void:
+	SaveManager.save_game(manager)
+	GameManager.raid_is_campaign = true
+	GameManager.raid_return_scene = "res://scenes/main.tscn"
+	get_tree().change_scene_to_file("res://scenes/world_map.tscn")
 
 ## Opens the campaign selection panel instead of jumping straight into a raid.
 func _on_attack_pressed() -> void:

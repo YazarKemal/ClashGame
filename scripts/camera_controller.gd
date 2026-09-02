@@ -12,6 +12,10 @@ extends Camera2D
 const MIN_ZOOM := 0.6
 const MAX_ZOOM := 2.0
 
+# Screen-px a left-mouse drag must exceed before it pans (kept short of the
+# building tap-selection distance so a click still selects).
+const DRAG_THRESHOLD := 12.0
+
 # Village grid extent (matches the ground node's 40x40 area).
 const GRID_SIZE := 40
 const TILE_SIZE := 32.0
@@ -33,6 +37,13 @@ var _pinch_base_zoom := 0.0
 # Whether the current single-finger gesture may pan; false when the press
 # began over a building or a UI control.
 var _pan_allowed := true
+
+# Mouse panning bookkeeping. Mouse buttons are handled here explicitly (the
+# scene's building code only reads touch events), mirroring the wheel-zoom and
+# middle/right-drag pan behaviour added to the world map.
+var _zoom_tween: Tween = null
+var _mouse_drag_button := -1        # mouse button currently held for a drag
+var _mouse_drag_origin := Vector2.ZERO
 
 # Screen-shake bookkeeping. Shake is applied to `offset` so it never fights the
 # pan/zoom-controlled `position`.
@@ -63,6 +74,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		_handle_touch(event)
 	elif event is InputEventScreenDrag:
 		_handle_drag(event)
+	elif event is InputEventMouseButton:
+		_handle_mouse_button(event)
+	elif event is InputEventMouseMotion:
+		_handle_mouse_motion(event)
 
 func _handle_touch(event: InputEventScreenTouch) -> void:
 	# Always keep the touch map accurate, even while locked, so the state is
@@ -91,6 +106,46 @@ func _handle_drag(event: InputEventScreenDrag) -> void:
 		_clamp_position()
 
 ## True if the pressed screen point lands on a placed building's cell.
+## PC mouse buttons: wheel zooms smoothly; middle/right drags pan freely; left
+## drag pans empty ground (never when the press started on a building, so the
+## click reaches building selection).
+func _handle_mouse_button(event: InputEventMouseButton) -> void:
+	var idx := event.button_index
+	if idx == MOUSE_BUTTON_WHEEL_UP:
+		_zoom_around(event.position, 1.08)
+		return
+	if idx == MOUSE_BUTTON_WHEEL_DOWN:
+		_zoom_around(event.position, 1.0 / 1.08)
+		return
+	if _mode_locked():
+		return
+	if idx == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_mouse_drag_button = idx
+			_mouse_drag_origin = event.position
+			_pan_allowed = not _touch_is_on_building(event.position)
+		else:
+			_mouse_drag_button = -1
+		return
+	if idx == MOUSE_BUTTON_MIDDLE or idx == MOUSE_BUTTON_RIGHT:
+		if event.pressed:
+			_mouse_drag_button = idx
+			_pan_allowed = true
+		else:
+			_mouse_drag_button = -1
+
+## Applies a held-drag pan for the active mouse button.
+func _handle_mouse_motion(event: InputEventMouseMotion) -> void:
+	if _mouse_drag_button < 0:
+		return
+	if _mouse_drag_button == MOUSE_BUTTON_LEFT and not _pan_allowed:
+		return  # press began on a building -> let click select instead
+	if _mouse_drag_button == MOUSE_BUTTON_LEFT \
+			and event.position.distance_to(_mouse_drag_origin) <= DRAG_THRESHOLD:
+		return  # still a potential tap
+	position -= event.relative / zoom.x
+	_clamp_position()
+
 func _touch_is_on_building(screen_pos: Vector2) -> bool:
 	if _manager == null:
 		return false
@@ -126,6 +181,32 @@ func _set_zoom(target_zoom: float, focus_screen_pos: Vector2) -> void:
 	var focus_world_after := position + (focus_screen_pos - viewport_center) / zoom.x
 	position += focus_world_before - focus_world_after
 	_clamp_position()
+
+## Smooth mouse-wheel zoom: zoom and position both ease so the world point under
+## the cursor stays anchored (the pinch path uses the instant _set_zoom above).
+func _zoom_around(screen: Vector2, factor: float) -> void:
+	var view := get_viewport_rect().size
+	var center := view * 0.5
+	var new_zoom := clampf(zoom.x * factor, MIN_ZOOM, MAX_ZOOM)
+	if is_equal_approx(new_zoom, zoom.x):
+		return
+	var anchor := position + (screen - center) / zoom.x
+	var new_pos := _clamp_for_zoom(anchor - (screen - center) / new_zoom, new_zoom)
+	if _zoom_tween != null and _zoom_tween.is_valid():
+		_zoom_tween.kill()
+	_zoom_tween = create_tween()
+	_zoom_tween.set_parallel(true)
+	_zoom_tween.tween_property(self, "zoom", Vector2(new_zoom, new_zoom), 0.12) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_zoom_tween.tween_property(self, "position", new_pos, 0.12) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+## Clamps a camera position so the view stays within limits at `zoom_val`.
+func _clamp_for_zoom(p: Vector2, zoom_val: float) -> Vector2:
+	var half := get_viewport_rect().size * 0.5 / zoom_val
+	return Vector2(
+		clampf(p.x, limit_left + half.x, limit_right - half.x),
+		clampf(p.y, limit_top + half.y, limit_bottom - half.y))
 
 func _clamp_position() -> void:
 	var half_view := _get_view_size() * 0.5
