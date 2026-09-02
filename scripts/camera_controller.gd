@@ -34,7 +34,14 @@ var _pinch_base_zoom := 0.0
 # began over a building or a UI control.
 var _pan_allowed := true
 
+# Screen-shake bookkeeping. Shake is applied to `offset` so it never fights the
+# pan/zoom-controlled `position`.
+var _shake_strength := 0.0
+var _shake_duration := 0.0
+var _shake_time := 0.0
+
 func _ready() -> void:
+	add_to_group("camera")
 	position = Vector2.ZERO
 	zoom = Vector2.ONE
 	limit_left = int(GRID_RECT.position.x - EDGE_MARGIN)
@@ -128,6 +135,29 @@ func _clamp_position() -> void:
 func _get_view_size() -> Vector2:
 	return get_viewport_rect().size / zoom
 
-func _process(_delta: float) -> void:
+## Starts a decaying screen shake for `duration` seconds. Re-triggering with a
+## stronger strength raises the current amplitude (trauma-style), so collapsing
+## several big buildings at once reads as one heavy rumble.
+func shake(strength: float, duration: float) -> void:
+	_shake_strength = maxf(_shake_strength, strength)
+	_shake_duration = maxf(_shake_duration, duration)
+	_shake_time = 0.0
+
+func _process(delta: float) -> void:
 	# Keep limits applied as the viewport resizes or zoom changes.
 	_clamp_position()
+	_update_shake(delta)
+
+## Applies a random offset that decays over the shake duration, then resets it.
+func _update_shake(delta: float) -> void:
+	if _shake_duration <= 0.0:
+		return
+	_shake_time += delta
+	var t := _shake_time / _shake_duration
+	if t >= 1.0:
+		_shake_duration = 0.0
+		offset = Vector2.ZERO
+		return
+	# Quadratic falloff keeps the start punchy and the tail gentle.
+	var intensity := _shake_strength * (1.0 - t) * (1.0 - t)
+	offset = Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * intensity

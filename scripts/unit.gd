@@ -163,12 +163,13 @@ func _nearest_wall() -> Node2D:
 
 func take_damage(amount: int) -> void:
 	hp -= amount
+	FxManager.float_text(global_position + Vector2(0, -16), "-%d" % amount,
+			Color(1.0, 0.4, 0.3, 1.0))
 	_flash_hit()
 	if _hp_bar != null:
 		_hp_bar.value = max(hp, 0)
 	if hp <= 0:
-		_spawn_death_particles()
-		queue_free()
+		_die()
 
 ## Briefly flashes the body white so hits are visible.
 func _flash_hit() -> void:
@@ -178,22 +179,11 @@ func _flash_hit() -> void:
 	var tw := create_tween()
 	tw.tween_property(_body, "color", _base_color, 0.1)
 
-func _spawn_death_particles() -> void:
-	var p := CPUParticles2D.new()
-	p.one_shot = true
-	p.explosiveness = 1.0
-	p.emitting = true
-	p.amount = 16
-	p.lifetime = 0.5
-	p.direction = Vector2.UP
-	p.spread = 180.0
-	p.initial_velocity_min = 50.0
-	p.initial_velocity_max = 120.0
-	p.gravity = Vector2(0, 150)
-	p.color = _base_color
-	p.position = position
-	add_child(p)
-	p.finished.connect(p.queue_free)
+## Debris burst on death, parented to the scene so it outlives this unit.
+func _die() -> void:
+	remove_from_group("units")
+	FxManager.burst(global_position, _base_color, 16, 0.4, 130.0)
+	queue_free()
 
 func _circle_points(radius: float, segments: int) -> PackedVector2Array:
 	var pts := PackedVector2Array()

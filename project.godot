@@ -23,3 +23,4 @@ config/features=PackedStringArray("4.7", "Mobile")
 GameManager="*res://scripts/game_manager.gd"
 SaveManager="*res://scripts/save_manager.gd"
 RaidManager="*res://scripts/raid_manager.gd"
+FxManager="*res://scripts/fx_manager.gd"

@@ -131,12 +131,15 @@ func _building_at_cell(cell: Vector2i) -> Building:
 	return null
 
 func _set_selected(b: Building) -> void:
-	if _selected != null and is_instance_valid(_selected) \
-			and _selected.destroyed.is_connected(_on_selected_destroyed):
-		_selected.destroyed.disconnect(_on_selected_destroyed)
+	if _selected != null and is_instance_valid(_selected):
+		if _selected.destroyed.is_connected(_on_selected_destroyed):
+			_selected.destroyed.disconnect(_on_selected_destroyed)
+		_selected.set_selected(false)
 	_selected = b
 	if b != null:
-		b.destroyed.connect(_on_selected_destroyed)
+		if not b.destroyed.is_connected(_on_selected_destroyed):
+			b.destroyed.connect(_on_selected_destroyed)
+		b.set_selected(true)
 	building_selected.emit(b)
 
 ## Auto-deselect when the currently selected building is destroyed by a unit.

@@ -122,6 +122,10 @@ var _attack_timer: Timer = null
 @onready var _label: Label = $Label
 @onready var _hp_bar: ProgressBar = $HpBar
 
+# Pulsing selection highlight, lazily created on set_selected(true).
+var _ring: Line2D = null
+var _ring_tween: Tween = null
+
 func _ready() -> void:
 	_apply_def(DATA[building_type])
 	_label.text = building_name
@@ -207,6 +211,43 @@ func _apply_state() -> void:
 	_body.color = _base_color
 	modulate.a = 1.0 if state == State.PLACED else 0.7
 
+## Shows or hides the pulsing white highlight that marks this building as the
+## current selection.
+func set_selected(on: bool) -> void:
+	if on:
+		_show_selection_ring()
+	else:
+		_hide_selection_ring()
+
+func _show_selection_ring() -> void:
+	if _ring != null:
+		return
+	var half := grid_size * GridConfig.TILE_SIZE * 0.5 + 6.0
+	_ring = Line2D.new()
+	_ring.closed = true
+	_ring.width = 3.0
+	_ring.default_color = Color(1, 1, 1, 1)
+	_ring.antialiased = true
+	_ring.z_index = 30
+	_ring.points = PackedVector2Array([
+		Vector2(-half, -half), Vector2(half, -half),
+		Vector2(half, half), Vector2(-half, half),
+	])
+	add_child(_ring)
+	_ring_tween = _ring.create_tween().set_loops()
+	_ring_tween.tween_property(_ring, "modulate:a", 0.25, 0.6) \
+		.set_trans(Tween.TRANS_SINE)
+	_ring_tween.tween_property(_ring, "modulate:a", 1.0, 0.6) \
+		.set_trans(Tween.TRANS_SINE)
+
+func _hide_selection_ring() -> void:
+	if _ring_tween != null and _ring_tween.is_valid():
+		_ring_tween.kill()
+		_ring_tween = null
+	if _ring != null:
+		_ring.queue_free()
+		_ring = null
+
 ## Sets the preview footprint centered on cell (top-left) and tints it
 ## green when valid, red when not.
 func set_preview(c: Vector2i, valid: bool) -> void:
@@ -238,6 +279,8 @@ func take_damage(amount: int) -> void:
 	if state != State.PLACED:
 		return
 	hp -= amount
+	FxManager.float_text(global_position + Vector2(0, -18), "-%d" % amount,
+			Color(1.0, 0.4, 0.3, 1.0))
 	_flash_hit()
 	_apply_hp_bar()
 	hp_changed.emit(maxi(hp, 0), max_hp)
@@ -268,27 +311,30 @@ func _flash_upgrade() -> void:
 	tw.tween_property(self, "modulate:a", 1.0, 0.08)
 
 func _die() -> void:
-	_spawn_death_particles()
+	_spawn_collapse()
+	_emit_loot_text()
+	# Big defensive collapses shake the screen so the moment lands.
+	if building_type == Type.TOWER or building_type == Type.TOWN_HALL:
+		FxManager.shake_cam(6.0, 0.35)
 	remove_from_group("buildings")
 	destroyed.emit(cells)
 	queue_free()
 
-func _spawn_death_particles() -> void:
-	var p := CPUParticles2D.new()
-	p.one_shot = true
-	p.explosiveness = 1.0
-	p.emitting = true
-	p.amount = 24
-	p.lifetime = 0.6
-	p.direction = Vector2.UP
-	p.spread = 180.0
-	p.initial_velocity_min = 60.0
-	p.initial_velocity_max = 140.0
-	p.gravity = Vector2(0, 200)
-	p.color = _base_color
-	p.position = position
-	add_child(p)
-	p.finished.connect(p.queue_free)
+## Coloured debris plus a grey dust puff where the building stood.
+func _spawn_collapse() -> void:
+	FxManager.burst(global_position, _base_color, 28, 0.4, 160.0)
+	FxManager.burst(global_position, Color(0.55, 0.53, 0.5, 1.0), 12, 0.5, 90.0)
+
+## Floating loot pickups for resources an enemy building carried (raid only).
+func _emit_loot_text() -> void:
+	var x := 0
+	if loot_gold > 0:
+		FxManager.float_text(global_position + Vector2(x, 0), "+%d G" % loot_gold,
+				Color(1.0, 0.85, 0.2, 1.0))
+		x = 22
+	if loot_elixir > 0:
+		FxManager.float_text(global_position + Vector2(x, 0), "+%d İ" % loot_elixir,
+				Color(0.72, 0.35, 1.0, 1.0))
 
 func _start_production() -> void:
 	if _timer != null:
@@ -334,6 +380,10 @@ func _nearest_unit_in_range() -> Node2D:
 	return best
 
 func _fire_bullet(target: Node2D) -> void:
+	# Brief muzzle flash at the edge of the tower facing the target.
+	var dir := (target.global_position - global_position).normalized()
+	var muzzle := global_position + dir * grid_size * GridConfig.TILE_SIZE * 0.45
+	FxManager.burst(muzzle, Color(1.0, 0.92, 0.5, 1.0), 6, 0.12, 70.0)
 	var bullet := Polygon2D.new()
 	bullet.polygon = _circle_points(4.0, 8)
 	bullet.color = Color(1.0, 0.95, 0.6, 1.0)
