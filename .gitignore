@@ -1,3 +1,15 @@
+﻿# Godot 4 önbellek ve yerel import verileri (Kesinlikle repoya girmemeli)
 .godot/
-*.import
-export_presets.cfg
+
+# Dışa aktarma çıktıları
+build/
+export/
+
+# Mono/C# dosyaları (kullanılıyorsa)
+.mono/
+*.csproj
+*.sln
+
+# Sistem dosyaları
+Thumbs.db
+.DS_Store
