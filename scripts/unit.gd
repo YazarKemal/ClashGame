@@ -23,10 +23,10 @@ func _ready() -> void:
 	_hp_bar.value = hp
 
 func _physics_process(delta: float) -> void:
-	var target := _nearest_building()
+	var target: Node2D = _nearest_building()
 	if target == null:
 		return
-	var to_target := target.global_position - global_position
+	var to_target: Vector2 = target.global_position - global_position
 	if to_target.length() > ATTACK_RANGE:
 		position += to_target.normalized() * SPEED * delta
 	else:
@@ -35,14 +35,15 @@ func _physics_process(delta: float) -> void:
 			target.take_damage(DAMAGE)
 			_attack_cd = ATTACK_INTERVAL
 
-func _nearest_building():
-	var best = null
+func _nearest_building() -> Node2D:
+	var best: Node2D = null
 	var best_d := INF
 	for b in get_tree().get_nodes_in_group("buildings"):
-		var d := global_position.distance_squared_to(b.global_position)
-		if d < best_d:
-			best = b
-			best_d = d
+		if b is Node2D:
+			var d: float = global_position.distance_squared_to(b.global_position)
+			if d < best_d:
+				best = b
+				best_d = d
 	return best
 
 func take_damage(amount: int) -> void:

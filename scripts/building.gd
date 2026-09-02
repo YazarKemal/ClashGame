@@ -175,20 +175,21 @@ func _start_attacks() -> void:
 	_attack_timer.timeout.connect(_attack)
 
 func _attack() -> void:
-	var target := _nearest_unit_in_range()
+	var target: Node2D = _nearest_unit_in_range()
 	if target == null:
 		return
 	_fire_bullet(target)
 	target.take_damage(ATTACK_DAMAGE)
 
-func _nearest_unit_in_range():
-	var best = null
+func _nearest_unit_in_range() -> Node2D:
+	var best: Node2D = null
 	var best_d := ATTACK_RANGE * ATTACK_RANGE + 1.0
 	for u in get_tree().get_nodes_in_group("units"):
-		var d := global_position.distance_squared_to(u.global_position)
-		if d <= ATTACK_RANGE * ATTACK_RANGE and d < best_d:
-			best = u
-			best_d = d
+		if u is Node2D:
+			var d: float = global_position.distance_squared_to(u.global_position)
+			if d <= ATTACK_RANGE * ATTACK_RANGE and d < best_d:
+				best = u
+				best_d = d
 	return best
 
 func _fire_bullet(target: Node2D) -> void:
