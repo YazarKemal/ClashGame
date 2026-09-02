@@ -182,6 +182,7 @@ func place_at(c: Vector2i) -> void:
 		for dy in range(grid_size):
 			cells.append(c + Vector2i(dx, dy))
 	state = State.PLACED
+	add_to_group("buildings")
 	position = _cell_center(c)
 	_apply_state()
 	_hp_bar.show()

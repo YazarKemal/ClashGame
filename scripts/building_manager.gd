@@ -102,13 +102,16 @@ func _handle_selection_tap(event: InputEvent) -> void:
 		if event.pressed:
 			_press_screen = event.position
 		elif event.position.distance_to(_press_screen) <= SELECT_TAP_DIST:
-			_select_at(event.position)
+			print("Dokunulan Dünya Konumu: ", get_global_mouse_position())
+			_select_at()
 
-func _select_at(screen_pos: Vector2) -> void:
-	var world := get_global_transform_with_canvas().affine_inverse() * screen_pos
-	var cell := GridConfig.world_to_cell(world)
+## Converts the global mouse/world position to a grid cell and selects the
+## building that owns it (or clears the selection on empty ground).
+func _select_at() -> void:
+	var cell := GridConfig.world_to_cell(get_global_mouse_position())
 	var found: Building = _building_at_cell(cell)
 	if found != null:
+		print("Bina Seçildi: ", found.building_name)
 		_set_selected(found)
 	else:
 		_set_selected(null)
