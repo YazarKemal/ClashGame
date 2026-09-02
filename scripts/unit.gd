@@ -1,6 +1,10 @@
 extends Node2D
 class_name Unit
 
+## Emitted right before the unit is freed so battle controllers can drop it
+## from their tracked-enemy sets without polling the scene tree.
+signal died
+
 ## Tactical troop types and their combat profile. Cost is paid in elixir on
 ## deploy; damage/range are scaled per type from DATA.
 enum Type { BARBARIAN, ARCHER, GIANT }
@@ -182,6 +186,7 @@ func _flash_hit() -> void:
 ## Debris burst on death, parented to the scene so it outlives this unit.
 func _die() -> void:
 	remove_from_group("units")
+	died.emit()
 	FxManager.burst(global_position, _base_color, 16, 0.4, 130.0)
 	queue_free()
 

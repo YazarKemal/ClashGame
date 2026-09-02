@@ -74,6 +74,29 @@ func load_game(manager: BuildingManager) -> bool:
 	GameManager.army_changed.emit()
 	_restore_stars(data.get("level_stars", {}))
 
+	_spawn_buildings_from_data(manager, data)
+	return true
+
+## Rebuilds a full clone of the SAVED village (types, grid cells and levels)
+## into `manager`, with no side effects on the real GameManager resources, army
+## or stars, and without triggering a save. Used by the defense scene to make a
+## disposable copy of the player's village for AI raids. Returns the number of
+## buildings cloned (0 when no save file exists or it is corrupt).
+func spawn_saved_buildings_into(manager: BuildingManager) -> int:
+	if not FileAccess.file_exists(SAVE_PATH):
+		return 0
+	var raw := FileAccess.get_file_as_string(SAVE_PATH)
+	var data: Variant = JSON.parse_string(raw)
+	if typeof(data) != TYPE_DICTIONARY:
+		push_warning("Kayıt dosyası bozuk, savunma köyü kurulamadı.")
+		return 0
+	return _spawn_buildings_from_data(manager, data)
+
+## Spawns every building stored in `data` via _spawn_building and returns the
+## count. Shared by load_game (village reload) and spawn_saved_buildings_into
+## (defense clone) so both paths stay identical.
+func _spawn_buildings_from_data(manager: BuildingManager, data: Dictionary) -> int:
+	var count := 0
 	for entry in data.get("buildings", []):
 		if typeof(entry) != TYPE_DICTIONARY:
 			continue
@@ -84,7 +107,8 @@ func load_game(manager: BuildingManager) -> bool:
 		var level := int(e.get("level", 1))
 		var hp := int(e.get("current_hp", 0))
 		_spawn_building(manager, type, cell, level, hp)
-	return true
+		count += 1
+	return count
 
 ## Restores the trained army from the save data. JSON turns integer troop-type
 ## keys into strings, so they are converted back to ints here.
