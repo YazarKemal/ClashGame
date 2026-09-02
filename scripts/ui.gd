@@ -20,6 +20,13 @@ var manager: BuildingManager
 @onready var cancel_button: Button = $PlacementButtons/CancelButton
 @onready var gold_label: Label = $TopBar/Margin/HBox/GoldLabel
 @onready var elixir_label: Label = $TopBar/Margin/HBox/ElixirLabel
+@onready var building_panel: PanelContainer = $BuildingPanel
+@onready var panel_title: Label = $BuildingPanel/Margin/VBox/TitleLabel
+@onready var panel_hp: Label = $BuildingPanel/Margin/VBox/HpLabel
+@onready var upgrade_button: Button = $BuildingPanel/Margin/VBox/UpgradeButton
+@onready var close_panel_button: Button = $BuildingPanel/Margin/VBox/ClosePanelButton
+
+var _selected_building: Building = null
 
 func _ready() -> void:
 	manager = get_node(manager_path)
@@ -35,10 +42,15 @@ func _ready() -> void:
 	close_menu_button.pressed.connect(_close_build_menu)
 	confirm_button.pressed.connect(_on_confirm_pressed)
 	cancel_button.pressed.connect(_on_cancel_pressed)
+	upgrade_button.pressed.connect(_on_upgrade_pressed)
+	close_panel_button.pressed.connect(_on_close_panel)
+
+	manager.building_selected.connect(_on_building_selected)
 
 	confirm_button.hide()
 	cancel_button.hide()
 	build_menu.hide()
+	building_panel.hide()
 
 	GameManager.resource_changed.connect(_update_resources)
 	_update_resources(GameManager.gold, GameManager.elixir)
@@ -46,6 +58,8 @@ func _ready() -> void:
 func _update_resources(gold: int, elixir: int) -> void:
 	gold_label.text = "Altın: %d" % gold
 	elixir_label.text = "İksir: %d" % elixir
+	# Keep the upgrade button's affordability in sync as gold/elixir change.
+	_refresh_panel()
 
 func _on_build_pressed() -> void:
 	build_button.hide()
@@ -98,3 +112,58 @@ func _on_confirm_pressed() -> void:
 
 func _on_cancel_pressed() -> void:
 	manager.cancel_placement()
+
+func _on_building_selected(b: Building) -> void:
+	_disconnect_selected()
+	_selected_building = b
+	if _selected_building == null:
+		building_panel.hide()
+		return
+	_selected_building.hp_changed.connect(_on_building_hp_changed)
+	_selected_building.upgraded.connect(_on_building_upgraded)
+	building_panel.show()
+	_refresh_panel()
+
+func _disconnect_selected() -> void:
+	if _selected_building == null:
+		return
+	if _selected_building.hp_changed.is_connected(_on_building_hp_changed):
+		_selected_building.hp_changed.disconnect(_on_building_hp_changed)
+	if _selected_building.upgraded.is_connected(_on_building_upgraded):
+		_selected_building.upgraded.disconnect(_on_building_upgraded)
+
+func _on_building_hp_changed(_current: int, _max_hp: int) -> void:
+	_refresh_panel()
+
+func _on_building_upgraded(_level: int) -> void:
+	_refresh_panel()
+
+func _refresh_panel() -> void:
+	if _selected_building == null:
+		return
+	var b := _selected_building
+	panel_title.text = "%s - Sv. %d" % [b.building_name, b.level]
+	panel_hp.text = "HP: %d/%d" % [b.hp, b.max_hp]
+	if b.level >= b.max_level:
+		upgrade_button.text = "MAKS SEVİYE"
+		upgrade_button.disabled = true
+	else:
+		var cur_word := "Altın" if b.currency == "gold" else "İksir"
+		var cost := b.upgrade_gold_cost() + b.upgrade_elixir_cost()
+		upgrade_button.text = "Yükselt (%d %s)" % [cost, cur_word]
+		upgrade_button.disabled = not _can_afford(b)
+
+func _can_afford(b: Building) -> bool:
+	return GameManager.gold >= b.upgrade_gold_cost() \
+			and GameManager.elixir >= b.upgrade_elixir_cost()
+
+func _on_upgrade_pressed() -> void:
+	if _selected_building == null:
+		return
+	if not _selected_building.upgrade():
+		_refresh_panel()
+
+func _on_close_panel() -> void:
+	_disconnect_selected()
+	_selected_building = null
+	building_panel.hide()

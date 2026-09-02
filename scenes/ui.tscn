@@ -1,4 +1,4 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui.gd" id="1_ui"]
 
@@ -7,6 +7,9 @@ bg_color = Color(0.16, 0.62, 0.22, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_cancel"]
 bg_color = Color(0.72, 0.18, 0.18, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+bg_color = Color(0.1, 0.12, 0.16, 0.92)
 
 [node name="UI" type="CanvasLayer"]
 script = ExtResource("1_ui")
@@ -138,3 +141,50 @@ theme_override_styles/pressed = SubResource("StyleBoxFlat_cancel")
 mouse_filter = 0
 visible = false
 text = "✕ İptal"
+
+[node name="BuildingPanel" type="PanelContainer" parent="."]
+visible = false
+custom_minimum_size = Vector2(320, 0)
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -160.0
+offset_top = -190.0
+offset_right = 160.0
+offset_bottom = -40.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+
+[node name="Margin" type="MarginContainer" parent="BuildingPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 12
+
+[node name="VBox" type="VBoxContainer" parent="BuildingPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="TitleLabel" type="Label" parent="BuildingPanel/Margin/VBox"]
+layout_mode = 2
+horizontal_alignment = 1
+text = "Bina - Sv. 1"
+
+[node name="HpLabel" type="Label" parent="BuildingPanel/Margin/VBox"]
+layout_mode = 2
+horizontal_alignment = 1
+text = "HP: 100/100"
+
+[node name="UpgradeButton" type="Button" parent="BuildingPanel/Margin/VBox"]
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+text = "Yükselt (0 Altın)"
+
+[node name="ClosePanelButton" type="Button" parent="BuildingPanel/Margin/VBox"]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+text = "Kapat"

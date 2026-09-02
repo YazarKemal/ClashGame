@@ -2,6 +2,8 @@ extends Node2D
 class_name Building
 
 signal destroyed(cells: Array)
+signal hp_changed(current_hp: int, max_hp: int)
+signal upgraded(level: int)
 
 enum State { PREVIEW, PLACED }
 enum Type { TOWER, MINE, TOWN_HALL, WALL }
@@ -67,6 +69,10 @@ var currency := "gold"
 var gold_per_sec := 0
 var max_hp := 100
 var hp := max_hp
+var level := 1
+var max_level := 3
+var attack_damage := ATTACK_DAMAGE
+var attack_range := ATTACK_RANGE
 var _base_color := Color(0.55, 0.6, 0.7, 1.0)
 
 var _timer: Timer = null
@@ -103,6 +109,45 @@ func elixir_cost() -> int:
 ## True if this is a Wall (defensive blocker), which units must break first.
 func is_wall() -> bool:
 	return building_type == Type.WALL
+
+## Cost to advance from the current level (in the building's own currency).
+func upgrade_cost() -> int:
+	return cost * level
+
+## Gold spent if this building's upgrade costs gold, else 0.
+func upgrade_gold_cost() -> int:
+	return upgrade_cost() if currency == "gold" else 0
+
+## Elixir spent if this building's upgrade costs elixir, else 0.
+func upgrade_elixir_cost() -> int:
+	return upgrade_cost() if currency == "elixir" else 0
+
+## True if the world point lies within this building's footprint.
+func contains_world_point(p: Vector2) -> bool:
+	var half := grid_size * GridConfig.TILE_SIZE * 0.5
+	return absf(p.x - position.x) <= half and absf(p.y - position.y) <= half
+
+## Advances the level: pays the upgrade cost, raises max HP by 40% (healing to
+## full), and boosts tower damage/range or mine production. Returns false if
+## already maxed out or the player cannot afford it.
+func upgrade() -> bool:
+	if level >= max_level:
+		return false
+	if not GameManager.spend_resources(upgrade_gold_cost(), upgrade_elixir_cost()):
+		return false
+	level += 1
+	max_hp = int(max_hp * 1.4)
+	hp = max_hp
+	if building_type == Type.TOWER:
+		attack_damage = int(attack_damage * 1.4)
+		attack_range = attack_range * 1.1
+	elif building_type == Type.MINE:
+		gold_per_sec = int(gold_per_sec * 1.4)
+	_apply_hp_bar()
+	_flash_upgrade()
+	upgraded.emit(level)
+	hp_changed.emit(hp, max_hp)
+	return true
 
 func _build_footprint() -> void:
 	var size := grid_size * GridConfig.TILE_SIZE
@@ -155,10 +200,17 @@ func take_damage(amount: int) -> void:
 		return
 	hp -= amount
 	_flash_hit()
-	if _hp_bar != null:
-		_hp_bar.value = max(hp, 0)
+	_apply_hp_bar()
+	hp_changed.emit(maxi(hp, 0), max_hp)
 	if hp <= 0:
 		_die()
+
+## Syncs the HP bar to the building's current and max HP.
+func _apply_hp_bar() -> void:
+	if _hp_bar == null:
+		return
+	_hp_bar.max_value = max_hp
+	_hp_bar.value = max(hp, 0)
 
 ## Briefly flashes the body white so hits are visible.
 func _flash_hit() -> void:
@@ -167,6 +219,14 @@ func _flash_hit() -> void:
 	_body.color = Color.WHITE
 	var tw := create_tween()
 	tw.tween_property(_body, "color", _base_color, 0.1)
+
+## Pulsing scale + alpha flash so a successful upgrade is clearly visible.
+func _flash_upgrade() -> void:
+	var tw := create_tween()
+	tw.tween_property(self, "scale", Vector2(1.15, 1.15), 0.12).set_trans(Tween.TRANS_QUAD)
+	tw.tween_property(self, "scale", Vector2.ONE, 0.12).set_trans(Tween.TRANS_QUAD)
+	tw.tween_property(self, "modulate:a", 0.5, 0.08)
+	tw.tween_property(self, "modulate:a", 1.0, 0.08)
 
 func _die() -> void:
 	_spawn_death_particles()
@@ -219,15 +279,15 @@ func _attack() -> void:
 	if target == null:
 		return
 	_fire_bullet(target)
-	target.take_damage(ATTACK_DAMAGE)
+	target.take_damage(attack_damage)
 
 func _nearest_unit_in_range() -> Node2D:
 	var best: Node2D = null
-	var best_d := ATTACK_RANGE * ATTACK_RANGE + 1.0
+	var best_d := attack_range * attack_range + 1.0
 	for u in get_tree().get_nodes_in_group("units"):
 		if u is Node2D:
 			var d: float = global_position.distance_squared_to(u.global_position)
-			if d <= ATTACK_RANGE * ATTACK_RANGE and d < best_d:
+			if d <= attack_range * attack_range and d < best_d:
 				best = u
 				best_d = d
 	return best
