@@ -89,14 +89,14 @@ func _setup_check_timer() -> void:
 	add_child(_check_timer)
 	_check_timer.timeout.connect(_check_end)
 
-## Ends the battle when every building is gone, or when the deployed troops are
-## all dead with buildings still standing.
+## Ends the battle when every building is gone, or when the whole trained army
+## has been spent and no units are left standing.
 func _check_end() -> void:
 	if battle_over:
 		return
 	if _count_buildings() == 0:
 		_end_battle()
-	elif _troops_deployed and _count_units() == 0:
+	elif _troops_deployed and GameManager.army_total() == 0 and _count_units() == 0:
 		_end_battle()
 
 func _count_buildings() -> int:

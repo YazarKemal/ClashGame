@@ -6,7 +6,7 @@ signal hp_changed(current_hp: int, max_hp: int)
 signal upgraded(level: int)
 
 enum State { PREVIEW, PLACED }
-enum Type { TOWER, MINE, TOWN_HALL, WALL, ELIXIR_COLLECTOR }
+enum Type { TOWER, MINE, TOWN_HALL, WALL, ELIXIR_COLLECTOR, BARRACKS, ARMY_CAMP }
 
 const ATTACK_RANGE := 200.0
 const ATTACK_DAMAGE := 25
@@ -62,6 +62,26 @@ const DATA := {
 		"color": Color(0.8, 0.2, 0.8, 1.0),
 		"gold_per_sec": 0,
 		"elixir_per_sec": 5,
+		"max_hp": 250,
+	},
+	Type.BARRACKS: {
+		"name": "Kışla",
+		"size": 2,
+		"cost": 150,
+		"currency": "elixir",
+		"color": Color(0.3, 0.45, 0.8, 1.0),
+		"gold_per_sec": 0,
+		"elixir_per_sec": 0,
+		"max_hp": 300,
+	},
+	Type.ARMY_CAMP: {
+		"name": "Ordu Kampı",
+		"size": 3,
+		"cost": 200,
+		"currency": "elixir",
+		"color": Color(0.35, 0.7, 0.35, 1.0),
+		"gold_per_sec": 0,
+		"elixir_per_sec": 0,
 		"max_hp": 250,
 	},
 }

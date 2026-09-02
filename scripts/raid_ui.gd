@@ -28,6 +28,7 @@ func setup(raid: Node, mgr: BuildingManager) -> void:
 	barbar_button.pressed.connect(_select_barbarian)
 	archer_button.pressed.connect(_select_archer)
 	giant_button.pressed.connect(_select_giant)
+	GameManager.army_changed.connect(_refresh_troop_bar)
 	result_window.hide()
 	_refresh_troop_bar()
 
@@ -56,9 +57,18 @@ func _select_giant() -> void:
 	_manager.selected_unit_type = Unit.Type.GIANT
 	_refresh_troop_bar()
 
-## Highlights the currently selected troop in the selector bar.
+## Shows each troop's ready count and grays out buttons with none available.
 func _refresh_troop_bar() -> void:
-	var sel := _manager.selected_unit_type
-	barbar_button.modulate = Color(1, 1, 1, 1) if sel == Unit.Type.BARBARIAN else Color(0.5, 0.5, 0.5, 1)
-	archer_button.modulate = Color(1, 1, 1, 1) if sel == Unit.Type.ARCHER else Color(0.5, 0.5, 0.5, 1)
-	giant_button.modulate = Color(1, 1, 1, 1) if sel == Unit.Type.GIANT else Color(0.5, 0.5, 0.5, 1)
+	_set_troop_button(barbar_button, Unit.Type.BARBARIAN, "Barbar")
+	_set_troop_button(archer_button, Unit.Type.ARCHER, "Okçu")
+	_set_troop_button(giant_button, Unit.Type.GIANT, "Dev")
+
+func _set_troop_button(btn: Button, t: Unit.Type, troop_name: String) -> void:
+	var count := GameManager.army_count(t)
+	btn.text = "%s (x%d)" % [troop_name, count]
+	btn.disabled = count <= 0
+	if count <= 0:
+		btn.modulate = Color(0.4, 0.4, 0.4, 1)
+	else:
+		btn.modulate = Color(1, 1, 1, 1) \
+				if _manager.selected_unit_type == t else Color(0.6, 0.6, 0.6, 1)

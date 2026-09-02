@@ -89,6 +89,16 @@ custom_minimum_size = Vector2(200, 60)
 layout_mode = 2
 text = "İksir Toplayıcı (100 G)"
 
+[node name="BarracksButton" type="Button" parent="BuildMenu/Margin/VBox"]
+custom_minimum_size = Vector2(200, 60)
+layout_mode = 2
+text = "Kışla (150 İ)"
+
+[node name="ArmyCampButton" type="Button" parent="BuildMenu/Margin/VBox"]
+custom_minimum_size = Vector2(200, 60)
+layout_mode = 2
+text = "Ordu Kampı (200 İ)"
+
 [node name="CloseMenuButton" type="Button" parent="BuildMenu/Margin/VBox"]
 custom_minimum_size = Vector2(200, 60)
 layout_mode = 2
@@ -210,6 +220,11 @@ layout_mode = 2
 horizontal_alignment = 1
 text = "HP: 100/100"
 
+[node name="TrainButton" type="Button" parent="BuildingPanel/Margin/VBox"]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+text = "Birlik Eğit"
+
 [node name="UpgradeButton" type="Button" parent="BuildingPanel/Margin/VBox"]
 custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
@@ -249,3 +264,55 @@ text = "Okçu (25 İksir)"
 custom_minimum_size = Vector2(150, 56)
 layout_mode = 2
 text = "Dev (80 İksir)"
+
+[node name="TrainWindow" type="PanelContainer" parent="."]
+visible = false
+custom_minimum_size = Vector2(260, 0)
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Margin" type="MarginContainer" parent="TrainWindow"]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 12
+
+[node name="VBox" type="VBoxContainer" parent="TrainWindow/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="TitleLabel" type="Label" parent="TrainWindow/Margin/VBox"]
+layout_mode = 2
+horizontal_alignment = 1
+text = "Birlik Eğitimi"
+
+[node name="ArmyLabel" type="Label" parent="TrainWindow/Margin/VBox"]
+layout_mode = 2
+horizontal_alignment = 1
+text = "Ordu: 0 / 0"
+
+[node name="BarbarTrainButton" type="Button" parent="TrainWindow/Margin/VBox"]
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+text = "Barbar (+15 İ)"
+
+[node name="ArcherTrainButton" type="Button" parent="TrainWindow/Margin/VBox"]
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+text = "Okçu (+25 İ)"
+
+[node name="GiantTrainButton" type="Button" parent="TrainWindow/Margin/VBox"]
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+text = "Dev (+80 İ)"
+
+[node name="CloseTrainButton" type="Button" parent="TrainWindow/Margin/VBox"]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+text = "Kapat"

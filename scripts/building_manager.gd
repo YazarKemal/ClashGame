@@ -143,16 +143,15 @@ func _set_selected(b: Building) -> void:
 func _on_selected_destroyed(_cells: Array) -> void:
 	_set_selected(null)
 
-## Deploys the currently selected troop at the tap point, charging its elixir
-## cost first (nothing spawns when the player cannot afford it).
+## Deploys the currently selected troop at the tap point, consuming it from the
+## trained army (nothing spawns when none of that troop type are ready).
 func _spawn_unit_at() -> void:
 	if deploy_only_on_border and not _is_border_cell(
 			GridConfig.world_to_cell(get_global_mouse_position())):
 		print("Asker sadece harita sınırlarına bırakılabilir.")
 		return
-	var cost := Unit.cost_for(selected_unit_type)
-	if not GameManager.spend_resources(0, cost):
-		print("Yetersiz İksir: %d" % cost)
+	if not GameManager.consume_troop(selected_unit_type):
+		print("Bu birimden hazır asker yok.")
 		return
 	var u: Unit = UNIT_SCENE.instantiate()
 	u.unit_type = selected_unit_type

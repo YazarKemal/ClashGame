@@ -8,17 +8,17 @@ enum Type { BARBARIAN, ARCHER, GIANT }
 const DATA := {
 	Type.BARBARIAN: {
 		"name": "Barbar", "max_hp": 100, "speed": 90.0, "range": 25.0,
-		"damage": 20, "cost": 15, "radius": 10.0,
+		"damage": 20, "cost": 15, "radius": 10.0, "slots": 1,
 		"color": Color(0.9, 0.2, 0.2, 1.0),
 	},
 	Type.ARCHER: {
 		"name": "Okçu", "max_hp": 50, "speed": 80.0, "range": 120.0,
-		"damage": 15, "cost": 25, "radius": 7.0,
+		"damage": 15, "cost": 25, "radius": 7.0, "slots": 1,
 		"color": Color(0.2, 0.8, 0.4, 1.0),
 	},
 	Type.GIANT: {
 		"name": "Dev", "max_hp": 450, "speed": 45.0, "range": 30.0,
-		"damage": 35, "cost": 80, "radius": 16.0,
+		"damage": 35, "cost": 80, "radius": 16.0, "slots": 5,
 		"color": Color(0.95, 0.55, 0.15, 1.0),
 	},
 }
@@ -40,9 +40,13 @@ var _attack_cd := 0.0
 @onready var _body: Polygon2D = $Body
 @onready var _hp_bar: ProgressBar = $HpBar
 
-## Elixir cost to deploy this troop type.
+## Elixir cost to train this troop type.
 static func cost_for(t: Type) -> int:
 	return DATA[t]["cost"]
+
+## Army-camp capacity slots this troop type occupies when trained.
+static func slots_for(t: Type) -> int:
+	return DATA[t]["slots"]
 
 func _ready() -> void:
 	add_to_group("units")

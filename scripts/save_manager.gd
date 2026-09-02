@@ -12,6 +12,8 @@ const TYPE_NAMES := {
 	Building.Type.TOWN_HALL: "town_hall",
 	Building.Type.WALL: "wall",
 	Building.Type.ELIXIR_COLLECTOR: "elixir_collector",
+	Building.Type.BARRACKS: "barracks",
+	Building.Type.ARMY_CAMP: "army_camp",
 }
 
 const TYPE_FROM_NAME := {
@@ -20,6 +22,8 @@ const TYPE_FROM_NAME := {
 	"town_hall": Building.Type.TOWN_HALL,
 	"wall": Building.Type.WALL,
 	"elixir_collector": Building.Type.ELIXIR_COLLECTOR,
+	"barracks": Building.Type.BARRACKS,
+	"army_camp": Building.Type.ARMY_CAMP,
 }
 
 ## Writes the current resources and every placed building to the save file.
@@ -36,6 +40,7 @@ func save_game(manager: BuildingManager) -> void:
 	var data := {
 		"resources": {"gold": GameManager.gold, "elixir": GameManager.elixir},
 		"buildings": buildings,
+		"army_data": GameManager.army_data,
 		"last_saved_time": int(Time.get_unix_time_from_system()),
 	}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
@@ -64,6 +69,9 @@ func load_game(manager: BuildingManager) -> bool:
 	GameManager.elixir = int(res.get("elixir", 500))
 	GameManager.resource_changed.emit(GameManager.gold, GameManager.elixir)
 
+	_restore_army(data.get("army_data", {}))
+	GameManager.army_changed.emit()
+
 	for entry in data.get("buildings", []):
 		if typeof(entry) != TYPE_DICTIONARY:
 			continue
@@ -75,6 +83,13 @@ func load_game(manager: BuildingManager) -> bool:
 		var hp := int(e.get("current_hp", 0))
 		_spawn_building(manager, type, cell, level, hp)
 	return true
+
+## Restores the trained army from the save data. JSON turns integer troop-type
+## keys into strings, so they are converted back to ints here.
+func _restore_army(raw_army: Dictionary) -> void:
+	GameManager.army_data = {}
+	for k in raw_army:
+		GameManager.army_data[int(k)] = int(raw_army[k])
 
 ## Rewrites only the resources in the existing save file, leaving the saved
 ## buildings untouched. Used when returning from a raid: the player's vault is
@@ -88,6 +103,7 @@ func save_resources_only() -> void:
 	if typeof(data) != TYPE_DICTIONARY:
 		return
 	data["resources"] = {"gold": GameManager.gold, "elixir": GameManager.elixir}
+	data["army_data"] = GameManager.army_data
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f != null:
 		f.store_string(JSON.stringify(data, "\t"))
@@ -104,6 +120,8 @@ func reset_village(manager: BuildingManager) -> void:
 	GameManager.gold = 500
 	GameManager.elixir = 500
 	GameManager.resource_changed.emit(500, 500)
+	GameManager.army_data = {}
+	GameManager.army_changed.emit()
 	if FileAccess.file_exists(SAVE_PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
 	_init_default_village(manager)

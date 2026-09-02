@@ -18,6 +18,8 @@ var manager: BuildingManager
 @onready var town_hall_button: Button = $BuildMenu/Margin/VBox/TownHallButton
 @onready var wall_button: Button = $BuildMenu/Margin/VBox/WallButton
 @onready var elixir_collector_button: Button = $BuildMenu/Margin/VBox/ElixirCollectorButton
+@onready var barracks_button: Button = $BuildMenu/Margin/VBox/BarracksButton
+@onready var army_camp_button: Button = $BuildMenu/Margin/VBox/ArmyCampButton
 @onready var close_menu_button: Button = $BuildMenu/Margin/VBox/CloseMenuButton
 @onready var confirm_button: Button = $PlacementButtons/ConfirmButton
 @onready var cancel_button: Button = $PlacementButtons/CancelButton
@@ -26,12 +28,19 @@ var manager: BuildingManager
 @onready var building_panel: PanelContainer = $BuildingPanel
 @onready var panel_title: Label = $BuildingPanel/Margin/VBox/TitleLabel
 @onready var panel_hp: Label = $BuildingPanel/Margin/VBox/HpLabel
+@onready var train_button: Button = $BuildingPanel/Margin/VBox/TrainButton
 @onready var upgrade_button: Button = $BuildingPanel/Margin/VBox/UpgradeButton
 @onready var close_panel_button: Button = $BuildingPanel/Margin/VBox/ClosePanelButton
 @onready var troop_bar: HBoxContainer = $TroopBar
 @onready var barbar_button: Button = $TroopBar/BarbarButton
 @onready var archer_button: Button = $TroopBar/ArcherButton
 @onready var giant_button: Button = $TroopBar/GiantButton
+@onready var train_window: PanelContainer = $TrainWindow
+@onready var army_label: Label = $TrainWindow/Margin/VBox/ArmyLabel
+@onready var barbar_train_button: Button = $TrainWindow/Margin/VBox/BarbarTrainButton
+@onready var archer_train_button: Button = $TrainWindow/Margin/VBox/ArcherTrainButton
+@onready var giant_train_button: Button = $TrainWindow/Margin/VBox/GiantTrainButton
+@onready var close_train_button: Button = $TrainWindow/Margin/VBox/CloseTrainButton
 
 var _selected_building: Building = null
 
@@ -49,11 +58,18 @@ func _ready() -> void:
 	town_hall_button.pressed.connect(_start_town_hall_placement)
 	wall_button.pressed.connect(_start_wall_placement)
 	elixir_collector_button.pressed.connect(_start_elixir_collector_placement)
+	barracks_button.pressed.connect(_start_barracks_placement)
+	army_camp_button.pressed.connect(_start_army_camp_placement)
 	close_menu_button.pressed.connect(_close_build_menu)
 	confirm_button.pressed.connect(_on_confirm_pressed)
 	cancel_button.pressed.connect(_on_cancel_pressed)
 	upgrade_button.pressed.connect(_on_upgrade_pressed)
 	close_panel_button.pressed.connect(_on_close_panel)
+	train_button.pressed.connect(_on_train_pressed)
+	barbar_train_button.pressed.connect(_on_train_barbar_pressed)
+	archer_train_button.pressed.connect(_on_train_archer_pressed)
+	giant_train_button.pressed.connect(_on_train_giant_pressed)
+	close_train_button.pressed.connect(_on_close_train_pressed)
 	barbar_button.pressed.connect(_on_barbar_pressed)
 	archer_button.pressed.connect(_on_archer_pressed)
 	giant_button.pressed.connect(_on_giant_pressed)
@@ -64,10 +80,13 @@ func _ready() -> void:
 	cancel_button.hide()
 	build_menu.hide()
 	building_panel.hide()
+	train_window.hide()
 	troop_bar.hide()
 
 	GameManager.resource_changed.connect(_update_resources)
+	GameManager.army_changed.connect(_refresh_troop_bar)
 	_update_resources(GameManager.gold, GameManager.elixir)
+	_refresh_troop_bar()
 
 func _update_resources(gold: int, elixir: int) -> void:
 	gold_label.text = "Altın: %d" % gold
@@ -127,10 +146,21 @@ func _start_elixir_collector_placement() -> void:
 	build_menu.hide()
 	build_button.show()
 
+func _start_barracks_placement() -> void:
+	manager.start_placement(Building.Type.BARRACKS)
+	build_menu.hide()
+	build_button.show()
+
+func _start_army_camp_placement() -> void:
+	manager.start_placement(Building.Type.ARMY_CAMP)
+	build_menu.hide()
+	build_button.show()
+
 func _on_placement_started() -> void:
 	confirm_button.show()
 	cancel_button.show()
 	troop_bar.hide()
+	train_window.hide()
 
 func _on_placement_ended(_success: bool) -> void:
 	confirm_button.hide()
@@ -149,6 +179,7 @@ func _on_building_selected(b: Building) -> void:
 	_selected_building = b
 	if _selected_building == null:
 		building_panel.hide()
+		train_window.hide()
 		return
 	_selected_building.hp_changed.connect(_on_building_hp_changed)
 	_selected_building.upgraded.connect(_on_building_upgraded)
@@ -175,6 +206,7 @@ func _refresh_panel() -> void:
 	var b := _selected_building
 	panel_title.text = "%s (Sv. %d)" % [b.building_name, b.level]
 	panel_hp.text = "HP: %d/%d" % [b.hp, b.max_hp]
+	train_button.visible = b.building_type == Building.Type.BARRACKS
 	if b.level >= b.max_level:
 		upgrade_button.text = "Maksimum"
 		upgrade_button.disabled = true
@@ -200,6 +232,7 @@ func _on_close_panel() -> void:
 	_disconnect_selected()
 	_selected_building = null
 	building_panel.hide()
+	train_window.hide()
 
 func _on_barbar_pressed() -> void:
 	_select_troop(Unit.Type.BARBARIAN)
@@ -214,9 +247,43 @@ func _select_troop(t: Unit.Type) -> void:
 	manager.selected_unit_type = t
 	_refresh_troop_bar()
 
-## Highlights the currently selected troop in the selector bar.
+## Shows each troop's ready count and grays out buttons with none available.
 func _refresh_troop_bar() -> void:
-	var sel := manager.selected_unit_type
-	barbar_button.modulate = Color(1, 1, 1, 1) if sel == Unit.Type.BARBARIAN else Color(0.5, 0.5, 0.5, 1)
-	archer_button.modulate = Color(1, 1, 1, 1) if sel == Unit.Type.ARCHER else Color(0.5, 0.5, 0.5, 1)
-	giant_button.modulate = Color(1, 1, 1, 1) if sel == Unit.Type.GIANT else Color(0.5, 0.5, 0.5, 1)
+	_set_troop_button(barbar_button, Unit.Type.BARBARIAN, "Barbar")
+	_set_troop_button(archer_button, Unit.Type.ARCHER, "Okçu")
+	_set_troop_button(giant_button, Unit.Type.GIANT, "Dev")
+
+func _set_troop_button(btn: Button, t: Unit.Type, troop_name: String) -> void:
+	var count := GameManager.army_count(t)
+	btn.text = "%s (x%d)" % [troop_name, count]
+	btn.disabled = count <= 0
+	if count <= 0:
+		btn.modulate = Color(0.4, 0.4, 0.4, 1)
+	else:
+		btn.modulate = Color(1, 1, 1, 1) \
+				if manager.selected_unit_type == t else Color(0.6, 0.6, 0.6, 1)
+
+func _on_train_pressed() -> void:
+	building_panel.hide()
+	train_window.show()
+	_refresh_train_window()
+
+func _on_close_train_pressed() -> void:
+	train_window.hide()
+	if _selected_building != null:
+		building_panel.show()
+
+func _on_train_barbar_pressed() -> void:
+	GameManager.train_troop(Unit.Type.BARBARIAN)
+	_refresh_train_window()
+
+func _on_train_archer_pressed() -> void:
+	GameManager.train_troop(Unit.Type.ARCHER)
+	_refresh_train_window()
+
+func _on_train_giant_pressed() -> void:
+	GameManager.train_troop(Unit.Type.GIANT)
+	_refresh_train_window()
+
+func _refresh_train_window() -> void:
+	army_label.text = "Ordu: %d / %d" % [GameManager.army_total(), GameManager.army_capacity()]
