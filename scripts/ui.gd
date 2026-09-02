@@ -12,8 +12,8 @@ const DEFENSE_TOWER_SIZE := 2
 var manager: BuildingManager
 
 @onready var build_button: Button = $BuildButton
-@onready var confirm_button: Button = $ConfirmButton
-@onready var cancel_button: Button = $CancelButton
+@onready var confirm_button: Button = $PlacementButtons/ConfirmButton
+@onready var cancel_button: Button = $PlacementButtons/CancelButton
 
 func _ready() -> void:
 	manager = get_node(manager_path)
