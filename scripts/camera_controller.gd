@@ -30,6 +30,10 @@ var _touches := {}  # int touch index -> Vector2 position
 var _pinch_base_dist := 0.0
 var _pinch_base_zoom := 0.0
 
+# Whether the current single-finger gesture may pan; false when the press
+# began over a building or a UI control.
+var _pan_allowed := true
+
 func _ready() -> void:
 	position = Vector2.ZERO
 	zoom = Vector2.ONE
@@ -58,6 +62,10 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 	# clean when a mode ends.
 	if event.pressed:
 		_touches[event.index] = event.position
+		# A press over a building or UI must not start a camera pan, so taps
+		# reach selection instead.
+		if event.index == 0:
+			_pan_allowed = not _touch_is_on_building(event.position)
 	else:
 		_touches.erase(event.index)
 	_pinch_base_dist = 0.0
@@ -71,9 +79,17 @@ func _handle_drag(event: InputEventScreenDrag) -> void:
 	# Two fingers down -> pinch-to-zoom; otherwise single-finger pan.
 	if _touches.size() >= 2:
 		_update_pinch()
-	elif event.index == 0:
+	elif event.index == 0 and _pan_allowed:
 		position -= event.relative / zoom.x
 		_clamp_position()
+
+## True if the pressed screen point lands on a placed building's cell.
+func _touch_is_on_building(screen_pos: Vector2) -> bool:
+	if _manager == null:
+		return false
+	var world := get_canvas_transform().affine_inverse() * screen_pos
+	var cell := GridConfig.world_to_cell(world)
+	return _manager.occupied.has(cell)
 
 func _update_pinch() -> void:
 	if _touches.size() < 2:

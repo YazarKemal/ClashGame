@@ -12,7 +12,7 @@ const UNIT_SCENE: PackedScene = preload("res://scenes/unit.tscn")
 
 var occupied: Dictionary = {}  # Vector2i -> true
 
-const SELECT_TAP_DIST := 24.0
+const SELECT_TAP_DIST := 15.0
 
 var placing := false
 var spawn_mode := false
@@ -20,9 +20,8 @@ var _preview: Building = null
 var _preview_cell := Vector2i.ZERO
 var _selected: Building = null
 
-# Tap detection: a press+release that barely moves is a tap, not a pan.
+# Tap detection: the press screen position, compared to the release position.
 var _press_screen := Vector2.ZERO
-var _pressing := false
 
 func is_cell_free(c: Vector2i) -> bool:
 	return not occupied.has(c)
@@ -96,28 +95,28 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Idle: a tap selects a building, a tap on empty ground deselects.
 	_handle_selection_tap(event)
 
-## Distinguishes a quick tap (select) from a drag (pan) on the empty map.
+## A release within SELECT_TAP_DIST of the press is a tap (select); anything
+## larger was a pan, so it selects nothing. Tolerates tiny drag jitter.
 func _handle_selection_tap(event: InputEvent) -> void:
 	if event is InputEventScreenTouch and event.index == 0:
 		if event.pressed:
 			_press_screen = event.position
-			_pressing = true
-		else:
-			if _pressing and event.position.distance_to(_press_screen) <= SELECT_TAP_DIST:
-				_select_at(event.position)
-			_pressing = false
-	elif event is InputEventScreenDrag and event.index == 0:
-		# A drag means the gesture was a pan, so it can't also be a tap.
-		_pressing = false
+		elif event.position.distance_to(_press_screen) <= SELECT_TAP_DIST:
+			_select_at(event.position)
 
 func _select_at(screen_pos: Vector2) -> void:
 	var world := get_global_transform_with_canvas().affine_inverse() * screen_pos
-	var found: Building = _building_at_world(world)
-	_set_selected(found)
+	var cell := GridConfig.world_to_cell(world)
+	var found: Building = _building_at_cell(cell)
+	if found != null:
+		_set_selected(found)
+	else:
+		_set_selected(null)
 
-func _building_at_world(world: Vector2) -> Building:
+## Returns the placed building that owns the given grid cell, if any.
+func _building_at_cell(cell: Vector2i) -> Building:
 	for b in get_tree().get_nodes_in_group("buildings"):
-		if b is Building and b.state == Building.State.PLACED and b.contains_world_point(world):
+		if b is Building and b.state == Building.State.PLACED and cell in b.cells:
 			return b
 	return null
 

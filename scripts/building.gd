@@ -122,11 +122,6 @@ func upgrade_gold_cost() -> int:
 func upgrade_elixir_cost() -> int:
 	return upgrade_cost() if currency == "elixir" else 0
 
-## True if the world point lies within this building's footprint.
-func contains_world_point(p: Vector2) -> bool:
-	var half := grid_size * GridConfig.TILE_SIZE * 0.5
-	return absf(p.x - position.x) <= half and absf(p.y - position.y) <= half
-
 ## Advances the level: pays the upgrade cost, raises max HP by 40% (healing to
 ## full), and boosts tower damage/range or mine production. Returns false if
 ## already maxed out or the player cannot afford it.

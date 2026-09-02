@@ -142,10 +142,10 @@ func _refresh_panel() -> void:
 	if _selected_building == null:
 		return
 	var b := _selected_building
-	panel_title.text = "%s - Sv. %d" % [b.building_name, b.level]
+	panel_title.text = "%s (Sv. %d)" % [b.building_name, b.level]
 	panel_hp.text = "HP: %d/%d" % [b.hp, b.max_hp]
 	if b.level >= b.max_level:
-		upgrade_button.text = "MAKS SEVİYE"
+		upgrade_button.text = "Maksimum"
 		upgrade_button.disabled = true
 	else:
 		var cur_word := "Altın" if b.currency == "gold" else "İksir"
