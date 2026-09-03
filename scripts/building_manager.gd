@@ -29,6 +29,30 @@ var _selected: Building = null
 # Tap detection: the press screen position, compared to the release position.
 var _press_screen := Vector2.ZERO
 
+## Becomes true the first time a genuine touch is seen (InputEventScreenTouch/
+## ScreenDrag). Real mouse input never produces touch events on desktop, so this
+## cleanly separates a mobile session from a desktop one for UI presentation
+## (e.g. whether to show the ✓ Onayla button / the desktop click hint). Falls
+## back to mobile (touch) whenever a touch appears, which is the conservative
+## direction that can never drop the mobile confirm flow.
+var touch_mode := false
+
+func _ready() -> void:
+	# Keep the preview's affordability tint live: if a mine/collector ticks while
+	# the player is mid-placement (or a purchase changes the balance), re-tint.
+	GameManager.resource_changed.connect(_on_resources_changed)
+
+## Observes input only to tell genuine touch apart from mouse; it never handles
+## anything. Must run before GUI (so button taps count too), which is why this is
+## `_input` rather than `_unhandled_input`.
+func _input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch or event is InputEventScreenDrag:
+		touch_mode = true
+
+func _on_resources_changed(_gold: int, _elixir: int) -> void:
+	if placing:
+		_apply_preview_validity()
+
 func is_cell_free(c: Vector2i) -> bool:
 	return not occupied.has(c)
 
@@ -86,6 +110,11 @@ func cancel_placement() -> void:
 	placement_ended.emit(false)
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey:
+		# Escape cancels an in-progress placement on desktop.
+		if event.pressed and event.keycode == KEY_ESCAPE and placing:
+			cancel_placement()
+		return
 	if event is InputEventMouseButton:
 		_handle_mouse_button(event)
 		return
@@ -108,9 +137,15 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Idle: a tap selects a building, a tap on empty ground deselects.
 	_handle_selection_tap(event)
 
-## Mouse mirror of the touch flow above: left-click selects/spawns/positions the
-## preview. Middle/right buttons are ignored here (the camera pans with them).
+## Mouse mirror of the touch flow above: left-click selects/spawns/positions.
+## While placing on desktop, a left-click on a placeable cell builds it straight
+## away (no Confirm button needed); the click goes through the same authoritative
+## confirm path the Confirm button uses. A right-click cancels placement (the
+## camera is locked during placement, so the right-drag pan is not active here).
 func _handle_mouse_button(event: InputEventMouseButton) -> void:
+	if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed and placing:
+		cancel_placement()
+		return
 	if event.button_index != MOUSE_BUTTON_LEFT:
 		return
 	if spawn_mode and not placing:
@@ -119,13 +154,31 @@ func _handle_mouse_button(event: InputEventMouseButton) -> void:
 		return
 	if placing and _preview != null:
 		if event.pressed:
-			_move_preview_to(event.position)
+			_try_build_at(event.position)
 		return
 	# Idle: press begins tap tracking; a release within the distance selects.
 	if event.pressed:
 		_press_screen = event.position
 	elif event.position.distance_to(_press_screen) <= SELECT_TAP_DIST:
 		_select_at()
+
+## Desktop direct-build: snap the preview under the cursor, then build through the
+## same authoritative confirm_placement() path. An invalid location builds nothing
+## (the red preview is the feedback); an unaffordable-but-valid location shows a
+## short "Yetersiz kaynak" notice. Resources are only ever spent in confirm_placement().
+func _try_build_at(screen_pos: Vector2) -> void:
+	_move_preview_to(screen_pos)
+	if not can_place_at(_preview_cell, _preview.grid_size):
+		return
+	if not _can_afford_preview():
+		_notify_insufficient_resources()
+		return
+	confirm_placement()
+
+## Brief screen notice when a build can't go ahead for lack of funds (reuses the
+## existing FxManager popup; no new notification system).
+func _notify_insufficient_resources() -> void:
+	FxManager.popup_notice("Yetersiz kaynak")
 
 ## While placing, the preview follows the mouse cursor.
 func _handle_mouse_motion(event: InputEventMouseMotion) -> void:
@@ -172,6 +225,12 @@ func _set_selected(b: Building) -> void:
 		b.set_selected(true)
 	building_selected.emit(b)
 
+## Clears any current building selection (hides its highlight ring and, via the
+## building_selected(null) signal, closes its info panel in the UI). Called when
+## entering build mode so a stale panel never overlaps placement UI.
+func deselect() -> void:
+	_set_selected(null)
+
 ## Auto-deselect when the currently selected building is destroyed by a unit.
 func _on_selected_destroyed(_cells: Array) -> void:
 	_set_selected(null)
@@ -213,7 +272,17 @@ func _move_preview_to(screen_pos: Vector2) -> void:
 func _apply_preview_validity() -> void:
 	if _preview == null:
 		return
-	_preview.set_preview(_preview_cell, can_place_at(_preview_cell, _preview.grid_size))
+	# A cell only reads as buildable (green) when the grid allows it AND the
+	# player can afford the selected building. Anything else shows the red tint.
+	_preview.set_preview(_preview_cell,
+			can_place_at(_preview_cell, _preview.grid_size) and _can_afford_preview())
+
+## True when the current preview's resource cost can be paid right now.
+func _can_afford_preview() -> bool:
+	if _preview == null:
+		return false
+	return GameManager.gold >= _preview.gold_cost() \
+			and GameManager.elixir >= _preview.elixir_cost()
 
 func _place_preview() -> void:
 	var b := _preview

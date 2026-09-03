@@ -43,6 +43,7 @@ var manager: BuildingManager
 @onready var archer_train_button: Button = $TrainWindow/Margin/VBox/ArcherTrainButton
 @onready var giant_train_button: Button = $TrainWindow/Margin/VBox/GiantTrainButton
 @onready var close_train_button: Button = $TrainWindow/Margin/VBox/CloseTrainButton
+@onready var placement_hint: Label = $PlacementHint
 @onready var campaign_panel: PanelContainer = $CampaignPanel
 @onready var level1_button: Button = $CampaignPanel/Margin/VBox/Level1Button
 @onready var level2_button: Button = $CampaignPanel/Margin/VBox/Level2Button
@@ -94,6 +95,7 @@ func _ready() -> void:
 
 	confirm_button.hide()
 	cancel_button.hide()
+	placement_hint.hide()
 	build_menu.hide()
 	building_panel.hide()
 	train_window.hide()
@@ -113,6 +115,9 @@ func _update_resources(gold: int, elixir: int) -> void:
 	_refresh_panel()
 
 func _on_build_pressed() -> void:
+	# Entering build mode takes priority: close any building info panel/ring that
+	# is open so it never overlaps the placement UI.
+	manager.deselect()
 	build_button.hide()
 	build_menu.show()
 
@@ -228,8 +233,14 @@ func _start_army_camp_placement() -> void:
 	build_button.show()
 
 func _on_placement_started() -> void:
-	confirm_button.show()
-	cancel_button.show()
+	# On a mouse-driven (desktop) session left-click builds directly, so the
+	# ✓ Onayla / ✕ İptal buttons are hidden in favour of a short click hint. A
+	# touch session keeps the buttons (touch only ever moves the preview, never
+	# auto-builds). touch_mode falls back to mobile, so this can't drop the flow.
+	var desktop := not manager.touch_mode
+	confirm_button.visible = not desktop
+	cancel_button.visible = not desktop
+	placement_hint.visible = desktop
 	troop_bar.hide()
 	train_window.hide()
 	campaign_panel.hide()
@@ -237,6 +248,7 @@ func _on_placement_started() -> void:
 func _on_placement_ended(_success: bool) -> void:
 	confirm_button.hide()
 	cancel_button.hide()
+	placement_hint.hide()
 	build_menu.hide()
 	build_button.show()
 
