@@ -5,6 +5,12 @@ extends Node
 
 const SAVE_PATH := "user://save_game.json"
 
+## Schema version for safe migration. Saves without a "version" field are treated
+## as v1 (the pre-D1 layout); v2 adds the top-level "player" block (kingdom +
+## world discovery). Existing v1 fields (resources/buildings/army/stars/
+## last_saved_time) are untouched and remain compatible.
+const SAVE_VERSION := 2
+
 ## Offline production never accumulates past this many seconds, so an absent
 ## player can't come back to an exploded economy after a multi-week absence.
 const MAX_OFFLINE_SECONDS := 8 * 3600  # 8 hours
@@ -51,10 +57,12 @@ func save_game(manager: BuildingManager) -> void:
 				"current_hp": maxi(b.hp, 0),
 			})
 	var data := {
+		"version": SAVE_VERSION,
 		"resources": {"gold": GameManager.gold, "elixir": GameManager.elixir},
 		"buildings": buildings,
 		"army_data": GameManager.army_data,
 		"level_stars": GameManager.best_stars,
+		"player": _player_snapshot(),
 		"last_saved_time": int(Time.get_unix_time_from_system()),
 	}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
@@ -87,6 +95,11 @@ func load_game(manager: BuildingManager) -> bool:
 	_restore_army(data.get("army_data", {}))
 	GameManager.army_changed.emit()
 	_restore_stars(data.get("level_stars", {}))
+	# Only override the in-memory Kingdom/discovery state when this save actually
+	# carries a "player" block (v2+). Legacy v1 saves leave the current in-memory
+	# value untouched so a Kingdom chosen moments ago in the select scene survives
+	# until main.gd persists it.
+	_restore_player(data)
 
 	_spawn_buildings_from_data(manager, data)
 
@@ -204,6 +217,37 @@ func _restore_stars(raw_stars: Dictionary) -> void:
 	for k in raw_stars:
 		GameManager.best_stars[int(k)] = int(raw_stars[k])
 
+## Serializable copy of the per-player Kingdom/world-discovery state (JSON-safe).
+func _player_snapshot() -> Dictionary:
+	return {
+		"kingdom_id": GameManager.kingdom_id,
+		"discovered_regions": GameManager.discovered_regions,
+		"discovered_pois": GameManager.discovered_pois,
+		"poi_state": GameManager.poi_state,
+	}
+
+## Restores the per-player Kingdom/world-discovery state from a v2+ save. When the
+## save predates the "player" block this does nothing, preserving whatever is
+## already in memory (see load_game).
+func _restore_player(data: Dictionary) -> void:
+	if not data.has("player"):
+		return
+	var p = data.get("player")
+	if typeof(p) != TYPE_DICTIONARY:
+		return
+	GameManager.kingdom_id = str(p.get("kingdom_id", ""))
+	GameManager.discovered_regions = _as_string_keyed_bools(p.get("discovered_regions", {}))
+	GameManager.discovered_pois = _as_string_keyed_bools(p.get("discovered_pois", {}))
+	GameManager.poi_state = p.get("poi_state", {}) if typeof(p.get("poi_state", {})) == TYPE_DICTIONARY else {}
+
+## Coerces a serialized {key: any} block into {key: true} (string keys as read
+## from JSON), tolerating missing entries.
+func _as_string_keyed_bools(raw: Dictionary) -> Dictionary:
+	var out := {}
+	for k in raw:
+		out[str(k)] = bool(raw[k])
+	return out
+
 ## Rewrites only the resources in the existing save file, leaving the saved
 ## buildings untouched. Used when returning from a raid: the player's vault is
 ## updated (troop costs spent, loot gained) and persisted without letting the
@@ -218,6 +262,8 @@ func save_resources_only() -> void:
 	data["resources"] = {"gold": GameManager.gold, "elixir": GameManager.elixir}
 	data["army_data"] = GameManager.army_data
 	data["level_stars"] = GameManager.best_stars
+	data["version"] = SAVE_VERSION
+	data["player"] = _player_snapshot()
 	# The player is present now, so the next village load must not treat the
 	# time spent in a raid as offline absence and credit extra production.
 	data["last_saved_time"] = int(Time.get_unix_time_from_system())
@@ -230,6 +276,9 @@ func save_resources_only() -> void:
 ## file, then reseeds a fresh village so the load path can be tested.
 func reset_village(manager: BuildingManager) -> void:
 	offline_summary = ""
+	# A full reset discards the Kingdom choice + world discovery too, so the
+	# player is offered Kingdom selection again on the next load (a fresh start).
+	GameManager.clear_world_state()
 	for b in manager.get_tree().get_nodes_in_group("buildings"):
 		if b is Building:
 			b.free()

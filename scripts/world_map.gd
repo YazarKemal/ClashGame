@@ -1,84 +1,53 @@
 extends Node2D
 
-## Macro world map. The player drags a single army icon around a symbolic
-## over-world between faction cities and neutral resource camps (M&B Warband
-## style). Scene switching is handled elsewhere; this scene only reads/writes
-## shared state on GameManager and shows UI.
+## Macro world map (WORLD -> REGION -> POI). Reads the static, designer-authored
+## world from the WorldData autoload and renders it as a pannable/zoomable map:
+## Regions are soft rectangles coloured by their owner; Points of Interest are
+## coloured markers inside a region. Per-player discovery state lives on
+## GameManager. Activities (raids/minigames/gathers) are NOT executed in D1 — a
+## POI's panel only previews what the future activity will do.
 ##
-## Interaction model:
-##   - Tap empty ground  -> army walks there (click-to-move).
-##   - Tap a node        -> army walks to it; on arrival the node's action runs
-##                          (resource camp drip starts / faction city panel opens).
-##   - Drag              -> pans the camera. Pinch (or mouse wheel) zooms.
-## Neutral resource camps give passive income every few seconds while the army
-## stays parked on them (AoE style). Hostile faction cities start a raid that
-## reuses raid.tscn and returns here when it ends.
+## Interaction model (Desktop + Mobile):
+##   - Tap a region  -> reveals it (discovery) and shows its info panel.
+##   - Tap a POI     -> shows its info panel (type / owner / activity preview).
+##   - Tap empty     -> clears the selection.
+##   - Drag          -> pans. Pinch (or wheel) zooms.
+##
+## This scene reuses the previous map's camera/pan/zoom code verbatim; only the
+## object layer was swapped from a roaming army over freeform nodes to a typed,
+## data-driven region/POI structure.
 
-const WORLD_NODE_SCENE: PackedScene = preload("res://scenes/world_node.tscn")
 const MAIN_SCENE := "res://scenes/main.tscn"
-const RAID_SCENE := "res://scenes/raid.tscn"
 
 ## Playable land (world coordinates); the camera is clamped inside it.
 const WORLD_RECT := Rect2(-700.0, -380.0, 1400.0, 760.0)
 const EDGE_MARGIN := 70.0
 
-const ARMY_SPEED := 430.0
-const ARRIVE_DIST := 20.0       # distance that counts as "reached"
-const NODE_TAP_RADIUS := 16.0   # extra slack for tapping a node vs ground
-const CAMP_TICK := 3.0          # seconds between resource-camp payments
-
-const MIN_ZOOM := 0.55
+const MIN_ZOOM := 0.5
 const MAX_ZOOM := 2.2
-const DRAG_THRESHOLD := 14.0    # screen px before a press becomes a pan
+const DRAG_THRESHOLD := 14.0   # screen px before a press becomes a pan
 
-const ARMY_COLOR := Color(0.16, 0.9, 0.95, 1.0)
+const POI_RADIUS := 15.0       # marker radius for a non-home POI
+const HOME_POI_RADIUS := 22.0  # marker radius for a HOME village POI
+const POI_TAP_SLACK := 9.0     # extra slack for tapping a POI marker
 
-## Static layout of the world (prototype). Mutable state (army position) lives
-## on GameManager so it survives the city->raid->world round trip.
-const NODE_DEFS := [
-	{ "id": "home", "type": WorldNode.Type.HOME_VILLAGE, "faction": WorldNode.Faction.NEUTRAL,
-		"tier": 0, "pos": Vector2(-540, 280), "radius": 46.0, "title": "Kendi Köyün" },
-
-	{ "id": "red1", "type": WorldNode.Type.FACTION_CITY, "faction": WorldNode.Faction.RED,
-		"tier": 1, "pos": Vector2(-60, -300), "radius": 44.0, "title": "Demir Karakolu" },
-	{ "id": "red2", "type": WorldNode.Type.FACTION_CITY, "faction": WorldNode.Faction.RED,
-		"tier": 2, "pos": Vector2(330, -300), "radius": 50.0, "title": "Kan Kalesi" },
-
-	{ "id": "blue1", "type": WorldNode.Type.FACTION_CITY, "faction": WorldNode.Faction.BLUE,
-		"tier": 0, "pos": Vector2(610, -140), "radius": 46.0, "title": "Gök Kalesi" },
-	{ "id": "blue2", "type": WorldNode.Type.FACTION_CITY, "faction": WorldNode.Faction.BLUE,
-		"tier": 0, "pos": Vector2(600, 250), "radius": 40.0, "title": "Ay Kulesi" },
-
-	{ "id": "camp_gold", "type": WorldNode.Type.RESOURCE_CAMP, "faction": WorldNode.Faction.NEUTRAL,
-		"tier": 0, "pos": Vector2(-330, -40), "radius": 34.0, "title": "Altın Vadi",
-		"gold_reward": 70, "elixir_reward": 0, "camp_interval": CAMP_TICK },
-	{ "id": "camp_elixir", "type": WorldNode.Type.RESOURCE_CAMP, "faction": WorldNode.Faction.NEUTRAL,
-		"tier": 0, "pos": Vector2(150, -40), "radius": 34.0, "title": "İksir Çayırı",
-		"gold_reward": 0, "elixir_reward": 60, "camp_interval": CAMP_TICK },
-	{ "id": "camp_border", "type": WorldNode.Type.RESOURCE_CAMP, "faction": WorldNode.Faction.NEUTRAL,
-		"tier": 0, "pos": Vector2(-60, 120), "radius": 34.0, "title": "Sınır Kampı",
-		"gold_reward": 40, "elixir_reward": 40, "camp_interval": CAMP_TICK },
-]
+const COLOR_DISCOVERED_BG := Color(0.05, 0.06, 0.09, 0.5)
+const COLOR_LOCKED := Color(0.10, 0.11, 0.13, 0.92)
+const COLOR_LOCKED_OUTLINE := Color(0.34, 0.37, 0.40, 0.9)
+const COLOR_SELECT := Color(1, 1, 1, 0.95)
 
 @onready var camera: Camera2D = $Camera2D
 @onready var gold_label: Label = $WorldUI/TopBar/Margin/HBox/GoldLabel
 @onready var elixir_label: Label = $WorldUI/TopBar/Margin/HBox/ElixirLabel
+@onready var hint_label: Label = $WorldUI/HintLabel
 @onready var node_panel: PanelContainer = $WorldUI/NodePanel
 @onready var node_title_label: Label = $WorldUI/NodePanel/Margin/VBox/NodeTitleLabel
 @onready var node_detail_label: Label = $WorldUI/NodePanel/Margin/VBox/NodeDetailLabel
 @onready var attack_button: Button = $WorldUI/NodePanel/Margin/VBox/ActionRow/AttackButton
 @onready var close_node_button: Button = $WorldUI/NodePanel/Margin/VBox/ActionRow/CloseNodeButton
 
-var _nodes: Dictionary = {}            # node_id -> WorldNode
-var _army_body: Polygon2D = null       # visual for the army icon
-var _army_pos := Vector2.ZERO          # world position of the army
-
-var _selected_node: WorldNode = null   # node with the selection ring
-var _travel_target := Vector2.ZERO     # where the army is heading
-var _arrival_node: WorldNode = null    # node to act on once reached
-var _moving := false
-var _active_camp: WorldNode = null     # camp currently paying income
-var _camp_timer: Timer = null
+var _selected_poi: POIDef = null        # POI shown in the panel (over region)
+var _selected_region: RegionDef = null  # region shown in the panel (no POI)
 
 # Camera / tap-vs-pan bookkeeping (single-finger and mouse share these flags).
 var _touches := {}                     # touch index -> screen pos
@@ -93,39 +62,45 @@ func _ready() -> void:
 	GameManager.in_raid = false
 	_update_resources(GameManager.gold, GameManager.elixir)
 	GameManager.resource_changed.connect(_update_resources)
-	attack_button.pressed.connect(_on_attack_pressed)
+	# Activities are not implemented in D1, so there is no attack action yet.
+	attack_button.visible = false
 	close_node_button.pressed.connect(_hide_node_panel)
 	$WorldUI/ReturnButton.pressed.connect(_return_village)
+	hint_label.text = ("Kaydırarak gez / yakınlaştır. "
+			+ "Noktalar: Yeşil Köy · Kırmızı Kale · Sarı Mabet · Turuncu Kaynak. "
+			+ "Keşfetmek ve bilgi için bir bölgeye dokun.")
 
-	# Node visuals first, then the army so the army renders above them.
-	_build_nodes()
-	_build_army()
-
-	# First time on the map: start the army at home.
-	if GameManager.world_army_pos == Vector2.ZERO:
-		GameManager.world_army_pos = _nodes["home"].position
-	_army_pos = GameManager.world_army_pos
-	_travel_target = _army_pos
-	_place_army()
-
-	camera.position = _army_pos
 	camera.limit_left = int(WORLD_RECT.position.x - EDGE_MARGIN)
 	camera.limit_top = int(WORLD_RECT.position.y - EDGE_MARGIN)
 	camera.limit_right = int(WORLD_RECT.end.x + EDGE_MARGIN)
 	camera.limit_bottom = int(WORLD_RECT.end.y + EDGE_MARGIN)
+
+	# Open the map centred on the player's home region (its Kingdom start).
+	var home = WorldData.starting_region_for(GameManager.kingdom_id)
+	camera.position = home.center if home != null else Vector2.ZERO
 	_clamp_camera()
 
-	_camp_timer = Timer.new()
-	_camp_timer.wait_time = CAMP_TICK
-	_camp_timer.autostart = true
-	add_child(_camp_timer)
-	_camp_timer.timeout.connect(_tick_camp_income)
+	queue_redraw()
 
-	FxManager.popup_notice("Sefer Haritası — ordunu bir noktaya yönlendir.", 2.0)
+func _kingdom_id() -> String:
+	return GameManager.kingdom_id
 
-## Soft green field for the playable land plus a boundary frame.
+func _region_discovered(r: RegionDef) -> bool:
+	return GameManager.region_discovered(r.id)
+
+func _region_visible(r: RegionDef) -> bool:
+	# Own Kingdom's regions are known from the start; foreign/neutral land only
+	# becomes visible once the player has tapped (discovered) it.
+	return _region_discovered(r)
+
+func _poi_visible(p: POIDef) -> bool:
+	var r := WorldData.region(p.region_id)
+	return r != null and _region_visible(r)
+
+# --- Drawing -------------------------------------------------------------------
+
 func _draw() -> void:
-	draw_rect(WORLD_RECT, Color(0.18, 0.3, 0.16, 1.0), true)
+	draw_rect(WORLD_RECT, Color(0.15, 0.24, 0.15, 1.0), true)
 	# Faint grid so distance/panning reads at a glance.
 	for x in range(int(WORLD_RECT.position.x), int(WORLD_RECT.end.x) + 1, 100):
 		draw_line(Vector2(x, WORLD_RECT.position.y),
@@ -133,148 +108,215 @@ func _draw() -> void:
 	for y in range(int(WORLD_RECT.position.y), int(WORLD_RECT.end.y) + 1, 100):
 		draw_line(Vector2(WORLD_RECT.position.x, y),
 				Vector2(WORLD_RECT.end.x, y), Color(0.9, 0.9, 0.9, 0.05), 1.0)
-	draw_rect(WORLD_RECT, Color(0.85, 0.9, 0.85, 0.6), false, 4.0)
 
-# --- Building the scene -------------------------------------------------------
+	var own := _kingdom_id()
+	for r in WorldData.region_defs():
+		_draw_region(r, own)
 
-func _build_nodes() -> void:
-	for def in NODE_DEFS:
-		var n: WorldNode = WORLD_NODE_SCENE.instantiate()
-		n.setup(def)   # before add_child so _ready renders with the final values
-		add_child(n)
-		_nodes[n.node_id] = n
+	for p in WorldData.poi_defs():
+		if _poi_visible(p):
+			_draw_poi(p)
 
-func _build_army() -> void:
-	_army_body = Polygon2D.new()
-	_army_body.polygon = _circle(16.0, 20)
-	_army_body.color = ARMY_COLOR
-	_army_body.z_index = 40
-	add_child(_army_body)
-	var outline := Line2D.new()
-	outline.closed = true
-	outline.width = 2.5
-	outline.default_color = Color(0, 0, 0, 0.8)
-	outline.points = _circle_points(16.0, 20)
-	outline.z_index = 41
-	_army_body.add_child(outline)   # parented so it travels with the army
+	# Selection highlight drawn on top.
+	if _selected_poi != null:
+		_draw_circle_ring(_selected_poi.position, HOME_POI_RADIUS + 6.0)
+	elif _selected_region != null:
+		_draw_region_ring(_selected_region)
 
-func _place_army() -> void:
-	_army_body.position = _army_pos
-
-# --- Movement -----------------------------------------------------------------
-
-func _process(delta: float) -> void:
-	var to_target := _travel_target - _army_pos
-	if to_target.length() > ARRIVE_DIST:
-		_moving = true
-		_army_pos += to_target.normalized() * ARMY_SPEED * delta
-		GameManager.world_army_pos = _army_pos
-		_place_army()
+func _draw_region(r: RegionDef, own: String) -> void:
+	var visible := _region_visible(r)
+	var rect := _region_rect(r)
+	if visible:
+		var c: Color = WorldData.owner_color_for_region(r)
+		var bg := Color(c.r, c.g, c.b, 0.32)
+		draw_rect(rect, bg, true)
+		draw_rect(rect, c, false, 3.0)
+		var txt := Color(c.r, c.g, c.b, 1.0).lightened(0.35)
+		_draw_center_text(rect.get_center(), r.display_name, 16, txt)
 	else:
-		_army_pos = _travel_target
-		GameManager.world_army_pos = _army_pos
-		_place_army()
-		if _moving:
-			_moving = false
-			var node := _arrival_node
-			_arrival_node = null
-			if node != null:
-				_on_arrive(node)
+		draw_rect(rect, COLOR_LOCKED, true)
+		draw_rect(rect, COLOR_LOCKED_OUTLINE, false, 2.0)
+		_draw_center_text(rect.get_center() + Vector2(0, -6),
+				"Keşfedilmedi", 13, Color(0.75, 0.78, 0.8, 0.9))
+		_draw_center_text(rect.get_center() + Vector2(0, 14),
+				"(dokunup keşfet)", 11, Color(0.6, 0.63, 0.66, 0.8))
+	# Owner ribbon above visible regions.
+	if visible and r.owning_kingdom_id != "":
+		var who := WorldData.owner_name_for_region(r)
+		_draw_center_text(rect.position + Vector2(0, -16), who, 12,
+				Color(1, 1, 1, 0.55))
 
-func _move_to(world: Vector2) -> void:
-	_hide_node_panel()
-	_travel_target = world
-	_arrival_node = null
-	_moving = true
+func _draw_poi(p: POIDef) -> void:
+	var r := WorldData.region(p.region_id)
+	var base: Color = WorldData.color_for_poi(p.poi_type)
+	if p.poi_type == POIDef.Type.HOME and _kingdom_id() != "" \
+			and r != null and r.owning_kingdom_id != _kingdom_id():
+		# Another Kingdom's home is a foreign capital — tint by its owner.
+		base = WorldData.owner_color_for_region(r)
+	var radius := HOME_POI_RADIUS if p.poi_type == POIDef.Type.HOME else POI_RADIUS
+	var col := base
+	# Subdued / depleted POIs render spent (muted), matching their runtime state.
+	if GameManager.poi_subdued(p.id) or GameManager.poi_depleted(p.id):
+		col = Color(0.45, 0.47, 0.5, 0.8)
+	draw_circle(p.position, radius, Color(0, 0, 0, 0.35))
+	draw_circle(p.position, radius - 2.0, col)
+	# A small glyph so the marker type reads even without art.
+	var glyph := _poi_glyph(p.poi_type)
+	if glyph != "":
+		_draw_center_text(p.position, glyph, 12, Color(0.08, 0.08, 0.1, 0.9))
+	# Home is the single most important marker; label it always.
+	if p.poi_type == POIDef.Type.HOME:
+		_draw_center_text(p.position + Vector2(0, radius + 12.0),
+				p.display_name, 13, Color(1, 1, 1, 0.95))
 
-func _send_to_node(node: WorldNode) -> void:
-	_hide_node_panel()
-	_select_node(node)
-	_travel_target = node.position
-	_arrival_node = node
-	_moving = true
+func _poi_glyph(t: int) -> String:
+	match t:
+		POIDef.Type.HOME:
+			return "K"
+		POIDef.Type.STRONGHOLD:
+			return "S"
+		POIDef.Type.SHRINE:
+			return "M"
+		POIDef.Type.GATHER:
+			return "R"
+	return ""
 
-func _select_node(node: WorldNode) -> void:
-	if _selected_node == node:
+func _region_rect(r: RegionDef) -> Rect2:
+	return Rect2(r.center - r.half, r.half * 2.0)
+
+func _draw_region_ring(r: RegionDef) -> void:
+	var rect := _region_rect(r)
+	draw_rect(Rect2(rect.position - Vector2.ONE * 5.0, rect.size + Vector2.ONE * 10.0),
+			COLOR_SELECT, false, 3.0)
+
+func _draw_circle_ring(center: Vector2, radius: float) -> void:
+	var pts := PackedVector2Array()
+	var segments := 40
+	for i in segments:
+		var a := TAU * i / segments
+		pts.append(center + Vector2(cos(a), sin(a)) * radius)
+	# draw_polyline gives an open ring around a filled marker.
+	var opened := PackedVector2Array()
+	for i in segments - 1:
+		opened.append(pts[i])
+	draw_polyline(opened, COLOR_SELECT, 3.0, true)
+
+## Draws `text` centred on `center` (both axes). Uses the fallback theme font so
+## no font resource is required.
+func _draw_center_text(center: Vector2, text: String, size: int, col: Color) -> void:
+	var font := ThemeDB.fallback_font
+	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+	var h := font.get_height(size)
+	draw_string(font, center + Vector2(-w * 0.5, -h * 0.5), text,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, size, col)
+
+# --- Selection -----------------------------------------------------------------
+
+func _fire_tap(screen: Vector2) -> void:
+	var world := _screen_to_world(screen)
+	var poi := _poi_at(world)
+	if poi != null:
+		_select_poi(poi)
 		return
-	if _selected_node != null:
-		_selected_node.set_selected(false)
-	_selected_node = node
-	if node != null:
-		node.set_selected(true)
-
-# --- Arrival & interactions ---------------------------------------------------
-
-func _on_arrive(node: WorldNode) -> void:
-	if node.type == WorldNode.Type.RESOURCE_CAMP:
-		# Passive income is handled by _tick_camp_income while we stay here.
-		FxManager.popup_notice("%s — kampa yerleşildi, pasif gelir başladı." % node.title, 1.6)
-	elif node.type == WorldNode.Type.FACTION_CITY:
-		if node.faction == WorldNode.Faction.RED:
-			_open_city_panel(node)
-		else:
-			FxManager.popup_notice("%s — müttefik şehri. Buraya saldıramazsın." % node.title, 2.0)
-
-func _tick_camp_income() -> void:
-	var camp := _camp_under_army()
-	if _active_camp != null and _active_camp != camp:
-		_active_camp.set_claimed(false)
-	_active_camp = camp
-	if camp == null:
+	var region := _region_at(world)
+	if region != null:
+		_select_region(region)
 		return
-	camp.set_claimed(true)
-	if camp.gold_reward > 0 or camp.elixir_reward > 0:
-		GameManager.add_resources(camp.gold_reward, camp.elixir_reward)
-		FxManager.float_text(camp.position + Vector2(0, -camp.radius - 8),
-				"+%d G  +%d İ" % [camp.gold_reward, camp.elixir_reward],
-				Color(1.0, 0.85, 0.2, 1.0))
+	_hide_node_panel()
+	_selected_poi = null
+	_selected_region = null
+	queue_redraw()
 
-func _camp_under_army() -> WorldNode:
-	var best: WorldNode = null
+func _select_poi(p: POIDef) -> void:
+	# Opening a POI also (re)confirms its region discovery.
+	var r := WorldData.region(p.region_id)
+	if r != null:
+		GameManager.discover_region(r.id)
+	GameManager.discover_poi(p.id)
+	_selected_poi = p
+	_selected_region = null
+	_show_poi_panel(p)
+	queue_redraw()
+
+func _select_region(r: RegionDef) -> void:
+	var just_discovered := not GameManager.region_discovered(r.id)
+	GameManager.discover_region(r.id)
+	# Revealing a region reveals the POIs within it too.
+	for p in WorldData.pois_of_region(r.id):
+		GameManager.discover_poi(p.id)
+	_selected_region = r
+	_selected_poi = null
+	_show_region_panel(r, just_discovered)
+	queue_redraw()
+
+func _poi_at(world: Vector2) -> POIDef:
+	var best: POIDef = null
 	var best_d: float = INF
-	for n in get_tree().get_nodes_in_group("world_nodes"):
-		if n is WorldNode:
-			var wn: WorldNode = n
-			if wn.type == WorldNode.Type.RESOURCE_CAMP:
-				var d: float = _army_pos.distance_to(wn.position)
-				if d <= wn.radius + 30.0 and d < best_d:
-					best = wn
-					best_d = d
+	for p in WorldData.poi_defs():
+		if not _poi_visible(p):
+			continue
+		var radius := HOME_POI_RADIUS if p.poi_type == POIDef.Type.HOME else POI_RADIUS
+		var d: float = world.distance_to(p.position)
+		if d <= radius + POI_TAP_SLACK and d < best_d:
+			best = p
+			best_d = d
 	return best
 
-func _open_city_panel(node: WorldNode) -> void:
-	_select_node(node)
-	node_title_label.text = "%s  (Sv. %d)" % [node.title, node.tier]
-	node_detail_label.text = _node_detail(node)
-	attack_button.visible = node.faction == WorldNode.Faction.RED
+func _region_at(world: Vector2) -> RegionDef:
+	for r in WorldData.region_defs():
+		if _region_rect(r).has_point(world):
+			return r
+	return null
+
+# --- Info panel ----------------------------------------------------------------
+
+func _show_poi_panel(p: POIDef) -> void:
+	node_title_label.text = p.display_name
+	var r := WorldData.region(p.region_id)
+	var owner := ""
+	if r != null:
+		owner = " · %s" % WorldData.owner_name_for_region(r)
+	node_detail_label.text = _poi_detail(p, r, owner)
 	node_panel.show()
 
-func _node_detail(node: WorldNode) -> String:
-	if node.faction == WorldNode.Faction.RED:
-		return "Kızıl Kabile kalesi. Güçlü savunması var — ordunu hazırlamışsan saldır."
-	if node.faction == WorldNode.Faction.BLUE:
-		return "Mavi Krallık müttefik şehri. Şimdilik saldırı yok."
-	return "Tarafsız bölge."
+func _poi_detail(p: POIDef, r: RegionDef, owner: String) -> String:
+	var lines: Array[String] = []
+	lines.append("Tür: %s%s" % [WorldData.poi_type_name(p.poi_type), owner])
+	if r != null and r.display_name != "":
+		lines.append("Bölge: %s" % r.display_name)
+	# State (only meaningful for conquerable/exhaustible POIs).
+	var state: Array[String] = []
+	if GameManager.poi_subdued(p.id):
+		state.append("bastırılmış")
+	if GameManager.poi_depleted(p.id):
+		state.append("tükenmiş")
+	if state.size() > 0:
+		lines.append("Durum: %s" % ", ".join(state))
+	# Activity preview (activities are not runnable in D1).
+	var act := WorldData.activity(p.activity_id) if p.activity_id != "" else null
+	if act != null:
+		lines.append("Aktivite: %s (gelecek pakette oynanabilir)" % act.display_name)
+	if p.note != "":
+		lines.append(p.note)
+	return "\n".join(lines)
+
+func _show_region_panel(r: RegionDef, just_discovered: bool) -> void:
+	node_title_label.text = r.display_name
+	var lines: Array[String] = []
+	lines.append("Tür: %s" % WorldData.region_type_name(r.region_type))
+	lines.append("Sahip: %s" % WorldData.owner_name_for_region(r))
+	if just_discovered:
+		lines.append("Bu bölgeyi keşfettin!")
+	var count := WorldData.pois_of_region(r.id).size()
+	if count > 0:
+		lines.append("İçindeki noktalar: %d" % count)
+	node_detail_label.text = "\n".join(lines)
+	node_panel.show()
 
 func _hide_node_panel() -> void:
 	node_panel.hide()
 
-## Starts a world-city raid: points raid.tscn at a non-campaign layout and tells
-## it to return to this map when the battle ends.
-func _on_attack_pressed() -> void:
-	var city := _selected_node
-	if city == null or city.faction != WorldNode.Faction.RED:
-		_hide_node_panel()
-		return
-	# For the prototype, reuse a campaign level template as the city's defences.
-	# (A dedicated per-city layout can replace this later.)
-	var tier := clampi(city.tier, 1, RaidManager.level_count())
-	GameManager.raid_is_campaign = false
-	GameManager.raid_layout = RaidManager.level_data(tier)
-	GameManager.raid_return_scene = "res://scenes/world_map.tscn"
-	get_tree().change_scene_to_file(RAID_SCENE)
-
-## Persists current resources then returns to the player's own village.
+## Persists current resources + discovery, then returns to the player's village.
 func _return_village() -> void:
 	SaveManager.save_resources_only()
 	GameManager.raid_is_campaign = true
@@ -285,7 +327,7 @@ func _update_resources(gold: int, elixir: int) -> void:
 	gold_label.text = "Altın: %d" % gold
 	elixir_label.text = "İksir: %d" % elixir
 
-# --- Input: taps move the army, drags pan, pinch/wheel zoom -------------------
+# --- Input: taps select, drags pan, pinch/wheel zoom --------------------------
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
@@ -306,7 +348,7 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 		if _touches.size() == 1:
 			_arm_tap(event.position)
 		else:
-			_disarm_tap()  # a second finger means pinch, not a move
+			_disarm_tap()  # a second finger means pinch, not a select
 	else:
 		_touches.erase(event.index)
 		if _touches.size() == 0 and _tap_armed:
@@ -348,7 +390,7 @@ func _handle_mouse_button(event: InputEventMouseButton) -> void:
 			_disarm_tap()
 			_pan_active = false
 		return
-	# Middle/right drag = free pan (never moves the army).
+	# Middle/right drag = free pan (never selects).
 	if idx == MOUSE_BUTTON_MIDDLE or idx == MOUSE_BUTTON_RIGHT:
 		if event.pressed:
 			_disarm_tap()
@@ -375,28 +417,6 @@ func _arm_tap(screen: Vector2) -> void:
 
 func _disarm_tap() -> void:
 	_tap_armed = false
-
-func _fire_tap(screen: Vector2) -> void:
-	var world := _screen_to_world(screen)
-	var node := _node_at(world)
-	if node != null:
-		_send_to_node(node)
-	else:
-		_select_node(null)
-		_move_to(world)
-
-func _node_at(world: Vector2) -> WorldNode:
-	var best: WorldNode = null
-	var best_d: float = INF
-	for n in get_tree().get_nodes_in_group("world_nodes"):
-		if n is WorldNode:
-			var wn: WorldNode = n
-			var d: float = wn.position.distance_to(world)
-			var reach: float = wn.radius + NODE_TAP_RADIUS
-			if d <= reach and d < best_d:
-				best = wn
-				best_d = d
-	return best
 
 # --- Camera helpers -----------------------------------------------------------
 
@@ -464,13 +484,3 @@ func _clamp_camera() -> void:
 
 func _screen_to_world(screen: Vector2) -> Vector2:
 	return get_canvas_transform().affine_inverse() * screen
-
-func _circle(radius: float, segments: int) -> PackedVector2Array:
-	return _circle_points(radius, segments)
-
-func _circle_points(radius: float, segments: int) -> PackedVector2Array:
-	var pts := PackedVector2Array()
-	for i in segments:
-		var a := TAU * i / segments
-		pts.append(Vector2(cos(a), sin(a)) * radius)
-	return pts
