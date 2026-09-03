@@ -152,13 +152,19 @@ func _compute_stars(pct: int, full_clear: bool) -> int:
 		stars += 1
 	return mini(stars, 3)
 
-## Returns to the main village, crediting looted resources and persisting the
-## updated vault without altering the saved main-village buildings.
+## Returns home, crediting looted resources and persisting the updated vault
+## without altering the saved main-village buildings. When the raid was a
+## Stronghold POI raid, the world consequence (subdue the keep) is resolved here
+## first so it is saved with this write. Campaign raids are unaffected.
 func _return_home() -> void:
 	GameManager.in_raid = false
 	if GameManager.raid_is_campaign:
 		GameManager.record_level_result(_current_level, _last_stars)
 	GameManager.add_resources(gained_gold, gained_elixir)
+	if GameManager.raid_is_stronghold:
+		# Victory = the keep's Town Hall was destroyed. This marks the POI subdued
+		# (exactly once) and clears the transient context before we persist.
+		GameManager.finish_stronghold_raid(_town_hall_destroyed)
 	SaveManager.save_resources_only()
 	var target := GameManager.raid_return_scene
 	if GameManager.raid_is_campaign or target.is_empty():

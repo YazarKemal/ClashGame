@@ -34,6 +34,17 @@ var raid_layout: Dictionary = {}
 ## Scene to return to when a non-campaign raid ends.
 var raid_return_scene := "res://scenes/main.tscn"
 
+## --- Transient stronghold-raid context (D2) -----------------------------------
+## While a Stronghold POI raid runs these say it is a stronghold raid and which
+## POI to subdue on a win. They are UNSAVED (never serialized) and are cleared by
+## finish_stronghold_raid once the battle resolves, so the world consequence is
+## applied exactly once and can never be duplicated by a reload or autosave.
+
+## True while the running raid is a Stronghold POI raid (not a campaign level).
+var raid_is_stronghold := false
+## The Stronghold POI id this raid targets ("" when not a stronghold raid).
+var stronghold_poi_id := ""
+
 ## Trained troops ready for deployment: Unit.Type (int) -> trained count.
 var army_data: Dictionary = {}
 
@@ -123,6 +134,17 @@ func set_poi_depleted(id: String, value: bool) -> void:
 	var st: Dictionary = poi_state.get(id, {})
 	st["depleted"] = value
 	poi_state[id] = st
+
+## Resolves a finished Stronghold raid: on a win the targeted POI is marked
+## subdued (this is the world consequence), then the transient raid context is
+## cleared so the effect is applied exactly once. Lives here (the activity/world
+## layer), not in raid.gd, per the D2 design. Safe to call from any raid flow;
+## it is a no-op when no stronghold raid context is present.
+func finish_stronghold_raid(won: bool) -> void:
+	if won and stronghold_poi_id != "":
+		set_poi_subdued(stronghold_poi_id, true)
+	raid_is_stronghold = false
+	stronghold_poi_id = ""
 
 ## Best stars earned for a level (0 when never attempted).
 func best_stars_for(level: int) -> int:

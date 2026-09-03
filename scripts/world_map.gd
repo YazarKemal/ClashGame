@@ -4,12 +4,14 @@ extends Node2D
 ## world from the WorldData autoload and renders it as a pannable/zoomable map:
 ## Regions are soft rectangles coloured by their owner; Points of Interest are
 ## coloured markers inside a region. Per-player discovery state lives on
-## GameManager. Activities (raids/minigames/gathers) are NOT executed in D1 — a
-## POI's panel only previews what the future activity will do.
+## GameManager. D2 makes Stronghold POIs (in CONTESTED regions) the first playable
+## activity: SALDIR launches a raid (reusing raid.tscn) and, on a win, the keep is
+## marked subdued and its region reads as secured. Other POI activities remain
+## previews only.
 ##
 ## Interaction model (Desktop + Mobile):
 ##   - Tap a region  -> reveals it (discovery) and shows its info panel.
-##   - Tap a POI     -> shows its info panel (type / owner / activity preview).
+##   - Tap a POI     -> shows its info panel (type / owner / state / action).
 ##   - Tap empty     -> clears the selection.
 ##   - Drag          -> pans. Pinch (or wheel) zooms.
 ##
@@ -18,6 +20,8 @@ extends Node2D
 ## data-driven region/POI structure.
 
 const MAIN_SCENE := "res://scenes/main.tscn"
+const WORLD_SCENE := "res://scenes/world_map.tscn"
+const RAID_SCENE := "res://scenes/raid.tscn"
 
 ## Playable land (world coordinates); the camera is clamped inside it.
 const WORLD_RECT := Rect2(-700.0, -380.0, 1400.0, 760.0)
@@ -35,6 +39,14 @@ const COLOR_DISCOVERED_BG := Color(0.05, 0.06, 0.09, 0.5)
 const COLOR_LOCKED := Color(0.10, 0.11, 0.13, 0.92)
 const COLOR_LOCKED_OUTLINE := Color(0.34, 0.37, 0.40, 0.9)
 const COLOR_SELECT := Color(1, 1, 1, 0.95)
+
+## A campaign level reused as a Stronghold keep's garrison (pre-authored, tested).
+const STRONGHOLD_LEVEL := 2
+
+## D2 consequence colours: a conquered keep / secured region reads player-green;
+## the next attackable keep is framed by a gold objective ring.
+const COLOR_SUBDUED := Color(0.3, 0.85, 0.5, 1.0)
+const COLOR_OBJECTIVE := Color(1.0, 0.92, 0.45, 1.0)
 
 @onready var camera: Camera2D = $Camera2D
 @onready var gold_label: Label = $WorldUI/TopBar/Margin/HBox/GoldLabel
@@ -62,13 +74,12 @@ func _ready() -> void:
 	GameManager.in_raid = false
 	_update_resources(GameManager.gold, GameManager.elixir)
 	GameManager.resource_changed.connect(_update_resources)
-	# Activities are not implemented in D1, so there is no attack action yet.
+	# The attack action row only appears for Stronghold POIs (set per panel).
 	attack_button.visible = false
+	attack_button.pressed.connect(_launch_stronghold_raid)
 	close_node_button.pressed.connect(_hide_node_panel)
 	$WorldUI/ReturnButton.pressed.connect(_return_village)
-	hint_label.text = ("Kaydırarak gez / yakınlaştır. "
-			+ "Noktalar: Yeşil Köy · Kırmızı Kale · Sarı Mabet · Turuncu Kaynak. "
-			+ "Keşfetmek ve bilgi için bir bölgeye dokun.")
+	_refresh_hint()
 
 	camera.limit_left = int(WORLD_RECT.position.x - EDGE_MARGIN)
 	camera.limit_top = int(WORLD_RECT.position.y - EDGE_MARGIN)
@@ -117,6 +128,12 @@ func _draw() -> void:
 		if _poi_visible(p):
 			_draw_poi(p)
 
+	# Objective pulse: frames the next attackable stronghold so the first conquest
+	# is discoverable even before the player learns to look for keeps.
+	var objective := _objective_stronghold()
+	if objective != null:
+		_draw_circle_ring(objective.position, HOME_POI_RADIUS + 6.0, COLOR_OBJECTIVE)
+
 	# Selection highlight drawn on top.
 	if _selected_poi != null:
 		_draw_circle_ring(_selected_poi.position, HOME_POI_RADIUS + 6.0)
@@ -145,6 +162,10 @@ func _draw_region(r: RegionDef, own: String) -> void:
 		var who := WorldData.owner_name_for_region(r)
 		_draw_center_text(rect.position + Vector2(0, -16), who, 12,
 				Color(1, 1, 1, 0.55))
+	# A CONTESTED region whose strongholds are all subdued reads as secured.
+	if visible and _region_secured(r):
+		_draw_center_text(rect.get_center() + Vector2(0, 26),
+				"GÜVENCE ALTINA ALINDI", 11, COLOR_SUBDUED)
 
 func _draw_poi(p: POIDef) -> void:
 	var r := WorldData.region(p.region_id)
@@ -154,14 +175,21 @@ func _draw_poi(p: POIDef) -> void:
 		# Another Kingdom's home is a foreign capital — tint by its owner.
 		base = WorldData.owner_color_for_region(r)
 	var radius := HOME_POI_RADIUS if p.poi_type == POIDef.Type.HOME else POI_RADIUS
+	# A subdued STRONGHOLD is the player's conquered keep: paint it player-green so
+	# it reads as secured, not as an ordinary spent POI. Other subdued/depleted
+	# POIs keep the muted grey.
+	var conquered_keep := p.poi_type == POIDef.Type.STRONGHOLD \
+			and GameManager.poi_subdued(p.id)
 	var col := base
-	# Subdued / depleted POIs render spent (muted), matching their runtime state.
-	if GameManager.poi_subdued(p.id) or GameManager.poi_depleted(p.id):
+	if conquered_keep:
+		col = COLOR_SUBDUED
+	elif GameManager.poi_subdued(p.id) or GameManager.poi_depleted(p.id):
 		col = Color(0.45, 0.47, 0.5, 0.8)
 	draw_circle(p.position, radius, Color(0, 0, 0, 0.35))
 	draw_circle(p.position, radius - 2.0, col)
-	# A small glyph so the marker type reads even without art.
-	var glyph := _poi_glyph(p.poi_type)
+	# A small glyph so the marker type reads even without art. A conquered keep
+	# swaps its S for a check to confirm the state change at a glance.
+	var glyph := "✓" if conquered_keep else _poi_glyph(p.poi_type)
 	if glyph != "":
 		_draw_center_text(p.position, glyph, 12, Color(0.08, 0.08, 0.1, 0.9))
 	# Home is the single most important marker; label it always.
@@ -189,7 +217,8 @@ func _draw_region_ring(r: RegionDef) -> void:
 	draw_rect(Rect2(rect.position - Vector2.ONE * 5.0, rect.size + Vector2.ONE * 10.0),
 			COLOR_SELECT, false, 3.0)
 
-func _draw_circle_ring(center: Vector2, radius: float) -> void:
+func _draw_circle_ring(center: Vector2, radius: float,
+		col: Color = COLOR_SELECT) -> void:
 	var pts := PackedVector2Array()
 	var segments := 40
 	for i in segments:
@@ -199,7 +228,7 @@ func _draw_circle_ring(center: Vector2, radius: float) -> void:
 	var opened := PackedVector2Array()
 	for i in segments - 1:
 		opened.append(pts[i])
-	draw_polyline(opened, COLOR_SELECT, 3.0, true)
+	draw_polyline(opened, col, 3.0, true)
 
 ## Draws `text` centred on `center` (both axes). Uses the fallback theme font so
 ## no font resource is required.
@@ -272,11 +301,17 @@ func _region_at(world: Vector2) -> RegionDef:
 
 func _show_poi_panel(p: POIDef) -> void:
 	node_title_label.text = p.display_name
-	var r := WorldData.region(p.region_id)
-	var owner := ""
-	if r != null:
-		owner = " · %s" % WorldData.owner_name_for_region(r)
-	node_detail_label.text = _poi_detail(p, r, owner)
+	if _is_stronghold(p):
+		# Strongholds get a raiding status line + SALDIR / ELE GEÇİRİLDİ action.
+		node_detail_label.text = _stronghold_detail(p)
+		_set_stronghold_action(p)
+	else:
+		var r := WorldData.region(p.region_id)
+		var owner := ""
+		if r != null:
+			owner = " · %s" % WorldData.owner_name_for_region(r)
+		node_detail_label.text = _poi_detail(p, r, owner)
+		attack_button.visible = false
 	node_panel.show()
 
 func _poi_detail(p: POIDef, r: RegionDef, owner: String) -> String:
@@ -300,6 +335,101 @@ func _poi_detail(p: POIDef, r: RegionDef, owner: String) -> String:
 		lines.append(p.note)
 	return "\n".join(lines)
 
+# --- Stronghold raiding (D2) ---------------------------------------------------
+
+func _is_stronghold(p: POIDef) -> bool:
+	return p != null and p.poi_type == POIDef.Type.STRONGHOLD
+
+## A stronghold is attackable when it is a bandit keep in a CONTESTED border
+## region that has not yet been subdued. The keep's region ownership does not gate
+## attacks (contested keeps are hostile until conquered); region ownership itself
+## is left unchanged by a conquest, per the D2 scope.
+func _is_attackable_stronghold(p: POIDef) -> bool:
+	if not _is_stronghold(p):
+		return false
+	var r := WorldData.region(p.region_id)
+	if r == null or r.region_type != RegionDef.Type.CONTESTED:
+		return false
+	return not GameManager.poi_subdued(p.id)
+
+func _stronghold_detail(p: POIDef) -> String:
+	var r := WorldData.region(p.region_id)
+	var lines: Array[String] = []
+	lines.append("Tür: %s" % WorldData.poi_type_name(p.poi_type))
+	if r != null:
+		lines.append("Bölge: %s (%s)" % [r.display_name,
+				WorldData.region_type_name(r.region_type)])
+	var subdued := GameManager.poi_subdued(p.id)
+	lines.append("Durum: %s" % ("ELE GEÇİRİLDİ" if subdued else "FETHEDİLMEDİ"))
+	if subdued:
+		lines.append("Garnizon dağıtıldı — bu kale artık güvenli.")
+	else:
+		lines.append("Haydut garnizonu hâlâ burada. Fethetmek için saldır ve "
+				+ "belediye binasını yok et.")
+	return "\n".join(lines)
+
+func _set_stronghold_action(p: POIDef) -> void:
+	if GameManager.poi_subdued(p.id):
+		attack_button.text = "✓ ELE GEÇİRİLDİ"
+		attack_button.disabled = true
+	else:
+		attack_button.text = "SALDIR"
+		attack_button.disabled = false
+	attack_button.visible = true
+
+## Launches a Stronghold raid by reusing raid.tscn with transient raid routing on
+## GameManager (never persisted). On return, raid.gd subdue the POI on a win.
+func _launch_stronghold_raid() -> void:
+	var p := _selected_poi
+	if p == null or not _is_attackable_stronghold(p):
+		return
+	GameManager.raid_is_campaign = false
+	GameManager.raid_is_stronghold = true
+	GameManager.stronghold_poi_id = p.id
+	# A campaign level (pre-authored, already-tested) stands in as this keep's
+	# garrison; the post-battle return routes straight back to the world map.
+	GameManager.raid_layout = RaidManager.level_data(STRONGHOLD_LEVEL)
+	GameManager.raid_return_scene = WORLD_SCENE
+	get_tree().change_scene_to_file(RAID_SCENE)
+
+## A CONTESTED region is "secured" once every stronghold it holds has been subdued
+## (all its bandit keeps cleared). Home/neutral regions are never marked secured.
+func _region_secured(r: RegionDef) -> bool:
+	if r == null or r.region_type != RegionDef.Type.CONTESTED:
+		return false
+	var has_keep := false
+	for p in WorldData.pois_of_region(r.id):
+		if p.poi_type == POIDef.Type.STRONGHOLD:
+			has_keep = true
+			if not GameManager.poi_subdued(p.id):
+				return false
+	return has_keep
+
+## The player's current conquest target: the first un-subdued stronghold in their
+## own Kingdom's CONTESTED border, or else any other un-subdued contested keep.
+func _objective_stronghold() -> POIDef:
+	var own := _kingdom_id()
+	var fallback: POIDef = null
+	for p in WorldData.poi_defs():
+		if not _poi_visible(p) or not _is_attackable_stronghold(p):
+			continue
+		var r := WorldData.region(p.region_id)
+		if r != null and r.owning_kingdom_id == own:
+			return p
+		if fallback == null:
+			fallback = p
+	return fallback
+
+func _refresh_hint() -> void:
+	var obj := _objective_stronghold()
+	if obj != null:
+		hint_label.text = ("Hedef: %s — kaleye dokun ve SALDIR.  "
+				% obj.display_name
+				+ "(Sürükle = kaydır · tekerlek / iki parmak = yakınlaştır)")
+	else:
+		hint_label.text = ("Keşfedilen kaleler fethedildi — sınırın güvenceye "
+				+ "alındı. Yeni bölgeler için dünyada kaydır, sonra KÖYE DÖN.")
+
 func _show_region_panel(r: RegionDef, just_discovered: bool) -> void:
 	node_title_label.text = r.display_name
 	var lines: Array[String] = []
@@ -310,7 +440,10 @@ func _show_region_panel(r: RegionDef, just_discovered: bool) -> void:
 	var count := WorldData.pois_of_region(r.id).size()
 	if count > 0:
 		lines.append("İçindeki noktalar: %d" % count)
+	if _region_secured(r):
+		lines.append("Güvence altına alındı: tüm kaleler fethedildi.")
 	node_detail_label.text = "\n".join(lines)
+	attack_button.visible = false
 	node_panel.show()
 
 func _hide_node_panel() -> void:
